@@ -226,13 +226,15 @@ The dataset card, model card and evaluation reports will be published on Hugging
 
 ## Roadmap
 
-- [ ] **Month 1: data foundation.** Licence audit, synthetic data generator, 500 real messages hand-labelled, baseline model.
-- [ ] **Month 2: models v1.** Merged dataset on Hugging Face, transformer fine-tuned, evaluation report, final gates.
-- [ ] **Month 3: free plugin.** PHP inference passing parity tests; Contact Form 7, WPForms, comments; quarantine; submitted to WordPress.org.
-- [ ] **Month 4: launch.** Live in the directory; Pro on sale.
-- [ ] **Months 5–6:** Gravity Forms, Elementor, Fluent Forms; distilled local model v2.
-- [ ] **Months 7–9:** opt-in corrections, sales-pitch folder, per-form-plugin guides.
-- [ ] **Months 10–12:** agency dashboard; model v3 trained on consented real data.
+- [ ] **Weeks 1–2: data foundation.** Licence audit, synthetic data generator, 500 real messages hand-labelled, baseline model.
+- [ ] **Weeks 3–4: models v1.** Merged dataset on Hugging Face, transformer fine-tuned, evaluation report, final gates.
+- [ ] **Weeks 3–6: free plugin.** PHP inference passing parity tests; Contact Form 7, WPForms, comments; quarantine; submitted to WordPress.org.
+- [ ] **~Week 9: launch.** Live in the directory once WordPress.org review completes; Pro on sale.
+- [ ] **Weeks 10–13:** Gravity Forms, Elementor, Fluent Forms; distilled local model v2.
+- [ ] **Weeks 14–19:** opt-in corrections, sales-pitch folder, per-form-plugin guides.
+- [ ] **Weeks 20–26:** agency dashboard; model v3 trained on consented real data (once enough has been shared).
+
+<sub>Timings depend on things outside our control, mainly real-world data arriving and the WordPress.org review queue.</sub>
 
 ## Repository layout
 

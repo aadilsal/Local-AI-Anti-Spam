@@ -71,10 +71,10 @@ Nobody pastes every form submission into ChatGPT. The job has to run automatical
 | Spam recall at that false-positive rate (local model) | 85% or higher (estimate, to confirm on the test set) | Before launch |
 | Spam recall with cloud model on borderline cases | 95% or higher (estimate) | Pro launch |
 | Local inference time on shared hosting | Under 20 ms per submission | Before launch |
-| Active installs | 300 by month 7; 3,400+ by month 12 | Ongoing |
-| Paying sites | 3 by month 8; about 125 by month 12 | Ongoing |
-| Monthly revenue | $100 by month 9; $500 by month 12 (stretch) | Ongoing |
-| WordPress.org rating | 4.5 stars or higher | From month 6 |
+| Active installs | 300 by 3 months after launch; 3,400+ by 8 months after launch | Ongoing |
+| Paying sites | 3 by 4 months after launch; about 125 by 8 months after launch | Ongoing |
+| Monthly revenue | $100 by 5 months after launch; $500 by 8 months after launch (stretch) | Ongoing |
+| WordPress.org rating | 4.5 stars or higher | From 2 months after launch |
 | Support threads answered within 48 hours | 90% or higher | Ongoing |
 | Running cost | $20/month or lower | Ongoing |
 
@@ -393,22 +393,24 @@ Privacy is the product's main selling point, so these are requirements, not note
 
 ## 14. Milestones and kill criteria
 
-Twelve months at about 20 hours a week. The free plugin goes to review in month 3 and Pro launches in month 4. Month 1 starts when work begins, not on a fixed calendar date.
+**Revised 10 Oct 2026 for AI-assisted development.** The original plan was twelve months of building at about 20 hours a week. With coding agents doing most of the implementation, the build is about six months to feature-complete, with launch at about week 9. External waits (real data, the WordPress.org review queue, Freemius) and organic growth don't compress, so the **business targets are anchored to the launch date**, with the same spacing as before. Week 1 starts when work begins.
 
-| Month | Milestone | Done when |
+| When | Milestone | Done when |
 |---|---|---|
-| 1 | Data foundation | Licences audited; synthetic generator working; 500 real messages hand-labelled; baseline linear model scored on them |
-| 2 | Models v1 | Merged dataset v1 on Hugging Face; transformer fine-tuned; evaluation report written; gates set with real numbers |
-| 3 | Free plugin built | PHP inference passes parity tests; Contact Form 7, WPForms and comments work; quarantine screen done; submitted to WordPress.org |
-| 4 | Launch | Plugin live in the directory; Freemius connected; cloud API running; Pro on sale |
-| 5–6 | Reach | Gravity Forms, Elementor and Fluent Forms added; distilled local model v2 shipped; first paying customer |
-| 7–9 | Learning loop | Opt-in corrections flowing; solicitation class live; per-form-plugin pages published; $100/month |
-| 10–12 | Agency | Agency dashboard live; model v3 trained on consented real data; $500/month stretch target |
+| Weeks 1–2 | Data foundation | Licences audited; synthetic generator working; 500 real messages hand-labelled; baseline linear model scored on them |
+| Weeks 3–4 | Models v1 | Merged dataset v1 on Hugging Face; transformer fine-tuned; evaluation report written; gates set with real numbers |
+| Weeks 3–6 | Free plugin built | PHP inference passes parity tests; Contact Form 7, WPForms and comments work; quarantine screen done; submitted to WordPress.org |
+| ~Week 9 (review-dependent) | Launch | Plugin live in the directory; Freemius connected; cloud API running; Pro on sale |
+| Weeks 10–13 | Reach | Gravity Forms, Elementor and Fluent Forms added; distilled local model v2 shipped |
+| Weeks 14–19 | Learning loop | Opt-in corrections flowing; solicitation class live; per-form-plugin pages published |
+| Weeks 20–26 | Agency | Agency dashboard live; model v3 trained on consented real data (once enough exists) |
+
+**Business targets, from launch:** first paying customer within 2 months; $100/month by 5 months; $500/month (stretch) and 3,400+ installs by 8 months.
 
 **Kill and pivot criteria**
 
-- Fewer than 300 active installs by month 7: narrow the listing to one form plugin, starting with Contact Form 7.
-- Fewer than 3 paying customers by month 8: make the plugin fully free as a portfolio piece, and sell the cloud model as a pay-per-use API on RapidAPI or Apify instead.
+- Fewer than 300 active installs 3 months after launch: narrow the listing to one form plugin, starting with Contact Form 7.
+- Fewer than 3 paying customers 4 months after launch: make the plugin fully free as a portfolio piece, and sell the cloud model as a pay-per-use API on RapidAPI or Apify instead.
 - Real-world false-positive rate above 1% after model v2: stop charging until it is fixed.
 - Running cost above $20/month before revenue covers it: move the cloud model to a cheaper host or reduce what counts as borderline.
 

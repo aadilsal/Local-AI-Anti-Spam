@@ -1,0 +1,9 @@
+* text=auto eol=lf
+
+*.php diff=php
+*.bin binary
+*.onnx binary
+*.parquet binary
+*.png binary
+*.jpg binary
+*.zip binary

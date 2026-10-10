@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<ruleset name="LocalAIAntiSpam">
+	<description>Coding standards for the free plugin (see document/agents.md §4).</description>
+
+	<file>.</file>
+	<exclude-pattern>/vendor/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+
+	<!-- PHP 7.4 is the minimum (F11). -->
+	<config name="testVersion" value="7.4-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<config name="minimum_wp_version" value="6.0"/>
+	<rule ref="WordPress-Extra"/>
+	<rule ref="WordPress-Docs">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="local-ai-anti-spam"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="laas"/>
+				<element value="LocalAIAntiSpam"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- PSR-4 class files (src/, tests/) don't follow the class-*.php naming rule. -->
+	<rule ref="WordPress.Files.FileName">
+		<exclude-pattern>/src/*</exclude-pattern>
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+</ruleset>

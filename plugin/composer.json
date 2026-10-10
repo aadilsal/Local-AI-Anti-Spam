@@ -1,0 +1,40 @@
+{
+  "name": "aadilsal/local-ai-anti-spam",
+  "description": "WordPress anti-spam plugin with a machine-learning model that runs on the site's own server.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=7.4"
+  },
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
+    "phpunit/phpunit": "^9.6",
+    "wp-coding-standards/wpcs": "^3.1",
+    "yoast/phpunit-polyfills": "^2.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "LocalAIAntiSpam\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "LocalAIAntiSpam\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "platform": {
+      "php": "7.4.33"
+    },
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "sort-packages": true
+  },
+  "scripts": {
+    "test": "phpunit",
+    "lint": "phpcs",
+    "lint:fix": "phpcbf"
+  }
+}

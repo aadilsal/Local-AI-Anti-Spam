@@ -27,6 +27,8 @@ __pycache__/
 # PHP / WordPress
 vendor/
 node_modules/
+.phpunit.result.cache
+.phpunit.cache/
 .wp-env.override.json
 *.zip
 

@@ -37,9 +37,10 @@ When you change a requirement, search the other documents for its ID.
 
 | Milestone (PRD §14) | State |
 |---|---|
-| Month 1: data foundation | **Next** |
-| Month 2: models v1 | Not started |
-| Month 3: free plugin built and submitted | Not started |
-| Month 4: launch + Pro | Not started |
+| Week 0: setup (repo, CI, tooling) | **In progress** |
+| Weeks 1–2: data foundation | Not started |
+| Weeks 3–4: models v1 | Not started |
+| Weeks 3–6: free plugin built and submitted | Not started |
+| ~Week 9: launch + Pro | Not started |
 
 Decisions still open are listed at the end of [PRD.md](PRD.md#15-risks-and-open-questions) and [design.md](design.md#7-open-design-questions).

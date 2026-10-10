@@ -1,0 +1,48 @@
+[project]
+name = "laas-training"
+version = "0.0.1"
+description = "Dataset, featurizer, training, export and evaluation for Local AI Anti-Spam."
+license = "GPL-2.0-or-later"
+requires-python = ">=3.11"
+dependencies = [
+    "datasketch>=1.6",
+    "numpy>=1.26",
+    "pyarrow>=16",
+    "pyyaml>=6",
+    "scikit-learn>=1.5",
+    "scipy>=1.13",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8",
+    "ruff>=0.6",
+    "types-pyyaml",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["laas"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["laas"]
+
+[[tool.mypy.overrides]]
+module = ["datasketch.*", "sklearn.*", "scipy.*", "pyarrow.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

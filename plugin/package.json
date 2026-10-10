@@ -1,0 +1,15 @@
+{
+  "name": "local-ai-anti-spam",
+  "private": true,
+  "description": "Dev tooling for the free plugin (local WordPress via wp-env).",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "env:start": "wp-env start",
+    "env:stop": "wp-env stop",
+    "env:clean": "wp-env clean all",
+    "wp": "wp-env run cli wp"
+  },
+  "devDependencies": {
+    "@wordpress/env": "11.17.0"
+  }
+}
