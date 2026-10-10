@@ -6,8 +6,10 @@ data/real/
 training/data/real/
 
 # Raw downloads and generated datasets
+DataSet/
 data/raw/
 training/data/raw/
+training/data/processed/
 training/runs/
 
 # Secrets
