@@ -1,5 +1,6 @@
 # Private planning (kept local)
 document/dev-plan.md
+*.local.md
 
 # Real, consented contact-form data: never commit (security-analysis S27)
 data/real/
