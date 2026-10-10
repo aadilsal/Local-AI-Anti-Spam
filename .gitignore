@@ -12,6 +12,7 @@ data/raw/
 training/data/raw/
 training/data/processed/
 training/runs/
+plugin/tests/bench/tmp/
 
 # Secrets
 .env

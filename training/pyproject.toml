@@ -35,6 +35,12 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Look-alike Cyrillic and Greek letters are the point of these files (homoglyph folding and its tests).
+"laas/featurize.py" = ["RUF001"]
+"laas/parity.py" = ["RUF001"]
+"tests/test_inference.py" = ["RUF001", "RUF003"]
+
 [tool.mypy]
 strict = true
 files = ["laas"]
