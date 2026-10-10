@@ -44,6 +44,7 @@ TRAINING_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = TRAINING_DIR / "data" / "processed" / "corpus_v1.parquet"
 DEFAULT_RUNS = TRAINING_DIR / "runs"
 COLUMNS = ["text", "label_id", "split_policy", "corpus_split", "language", "source", "domain"]
+EVAL_BATCH = 5000
 
 
 def _featurize_one(
@@ -188,8 +189,14 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     started = time.perf_counter()
+
+    def log(message: str) -> None:
+        print(f"[{time.perf_counter() - started:7.1f}s] {message}", flush=True)
+
+    log(f"{args.mode}: {train.num_rows:,} training rows; featurizing with {args.workers} workers")
     with Pool(args.workers) as pool:
         x_train, d_train = featurize_many(train.column("text").to_pylist(), n_buckets, pool)
+        log(f"Featurized training set ({x_train.nnz:,} non-zeros); fitting logistic regression")
         means, stds = d_train.mean(axis=0), d_train.std(axis=0)
         stds = np.where(stds > 1e-12, stds, 1.0)
         y_train = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
@@ -201,14 +208,22 @@ def main(argv: list[str] | None = None) -> int:
         w = model.coef_[0].astype(np.float32).astype(np.float64)  # what model.bin will hold
         bias = float(model.intercept_[0])
 
+        del x_train  # free memory before scoring the evaluation sets
+        log("Model fitted; scoring evaluation sets")
+
         def logits(t: Any) -> npt.NDArray[np.float64]:
-            xs, ds = featurize_many(t.column("text").to_pylist(), n_buckets, pool)
-            out: npt.NDArray[np.float64] = (
-                xs @ w[:n_buckets] + ((ds - means) / stds) @ w[n_buckets:] + bias
-            )
+            texts = t.column("text").to_pylist()
+            parts = []
+            for start in range(0, len(texts), EVAL_BATCH):  # batches keep peak memory low
+                xs, ds = featurize_many(texts[start : start + EVAL_BATCH], n_buckets, pool)
+                parts.append(xs @ w[:n_buckets] + ((ds - means) / stds) @ w[n_buckets:] + bias)
+            out: npt.NDArray[np.float64] = np.concatenate(parts) if parts else np.zeros(0)
             return out
 
-        z = {name: logits(t) for name, t in sets.items()}
+        z = {}
+        for name, t in sets.items():
+            z[name] = logits(t)
+            log(f"Scored {name} ({t.num_rows:,} rows)")
     seconds = time.perf_counter() - started
 
     y = {
