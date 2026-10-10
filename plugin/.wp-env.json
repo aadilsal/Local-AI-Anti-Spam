@@ -1,14 +1,16 @@
 {
   "$schema": "https://schemas.wp.org/trunk/wp-env.json",
-  "phpVersion": "7.4",
-  "plugins": [
-    ".",
-    "https://downloads.wordpress.org/plugin/contact-form-7.latest-stable.zip",
-    "https://downloads.wordpress.org/plugin/wpforms-lite.latest-stable.zip"
-  ],
+  "phpVersion": "8.3",
+  "plugins": [],
+  "mappings": {
+    "wp-content/plugins/local-ai-anti-spam": "."
+  },
   "config": {
     "WP_DEBUG": true,
     "WP_DEBUG_LOG": true,
     "SCRIPT_DEBUG": true
+  },
+  "lifecycleScripts": {
+    "afterStart": "wp-env run cli wp plugin install contact-form-7 wpforms-lite --activate && wp-env run cli wp plugin activate local-ai-anti-spam"
   }
 }
