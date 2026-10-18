@@ -46,6 +46,11 @@ python -m laas.train --config configs/local-v1.yaml
 python -m laas.export --run runs/<id>  # writes plugin/model/model.bin + parity/fixtures.json
 python -m laas.eval --run runs/<id>    # runs the gates, writes eval/report.md
 
+# Synthetic data (generation runs on a Kaggle/Colab GPU, never locally)
+python -m laas.synth.notebook          # rebuild notebooks/generate_synthetic.ipynb after editing spec.py/gen.py
+python -m laas.synth.ingest            # data/synthetic/*.jsonl -> data/processed/synthetic_v1.parquet
+python -m laas.train_local --extra data/processed/synthetic_v1.parquet --holdout youtube_spam
+
 # Cloud (from cloud-api/)
 uv sync && pytest
 docker compose up --build

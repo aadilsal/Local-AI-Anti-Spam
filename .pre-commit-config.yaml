@@ -19,5 +19,7 @@ repos:
       - id: ruff-check
         args: ["--fix"]
         files: ^(training|cloud-api)/
+        exclude: \.ipynb$  # generated notebooks; their code is linted at the source
       - id: ruff-format
         files: ^(training|cloud-api)/
+        exclude: \.ipynb$

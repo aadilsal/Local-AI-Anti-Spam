@@ -45,7 +45,7 @@ Non-commercial, research-only, or copyright kept by senders.
 | Source | PRD use | Status |
 |---|---|---|
 | `Deysi/spam-detection-dataset` | Train with caution | Not included (Hugging Face unreachable when the corpus was built). Provenance undocumented (review note R10): if added, tag it so a retrain without it is one flag |
-| Synthetic contact-form set | Main training data | To build (W1-03/04). Generator licence must place no conditions on outputs |
+| Synthetic contact-form set | Main training data | Generator built (`laas/synth/`, Kaggle notebook). Generators, checked on Hugging Face 18 Oct 2026: **Qwen/Qwen2.5-7B-Instruct(-AWQ): Apache-2.0**; **microsoft/Phi-4-mini-instruct: MIT**. Both place no conditions on outputs. `laas.synth.ingest` refuses rows from any generator not listed in `GENERATOR_LICENCES` |
 | Hand-labelled real messages | **Test only** | Collecting (beta call). `split_policy = test_only` |
 | Opt-in user corrections | Train from model v3 | After launch, under our consent terms |
 

@@ -11,6 +11,7 @@ DataSet/
 data/raw/
 training/data/raw/
 training/data/processed/
+training/data/synthetic/
 training/runs/
 plugin/tests/bench/tmp/
 

@@ -185,6 +185,15 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
+    parser.add_argument(
+        "--extra",
+        type=Path,
+        action="append",
+        default=[],
+        metavar="PARQUET",
+        help="More data in the same schema, e.g. data/processed/synthetic_v1.parquet. Its rows "
+        "follow their own split_policy and corpus_split. Repeat for several files.",
+    )
     parser.add_argument("--runs", type=Path, default=DEFAULT_RUNS)
     parser.add_argument("--mode", choices=["production", "experiment"], default="production")
     parser.add_argument("--bucket-bits", type=int, default=19)
@@ -212,7 +221,9 @@ def main(argv: list[str] | None = None) -> int:
 
     n_buckets = 1 << args.bucket_bits
     rng = np.random.default_rng(args.seed)
-    full = pq.read_table(args.data, columns=COLUMNS)
+    full = pa.concat_tables(
+        [pq.read_table(path, columns=COLUMNS) for path in [args.data, *args.extra]]
+    )
     full = full.filter(pc.equal(full.column("language"), "en"))
     production = args.mode == "production"
 
