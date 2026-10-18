@@ -26,7 +26,9 @@ this notebook by hand.
 **Run it on Kaggle (recommended)**
 1. *Settings* (right panel): **Accelerator: GPU T4 x2**, **Internet: On** (needs a phone-verified
    account).
-2. Leave `PILOT = True` for the first run (about 1,000 messages, roughly 20-30 minutes).
+2. Leave `PILOT = True` for the first run (about 1,000 messages, roughly 20-40 minutes).
+   Leave `USE_VLLM = False` unless you want to try the faster engine (it runs isolated, so it
+   can't break anything; if it fails the run continues with transformers).
 3. **Save Version, then Save & Run All (Commit)**, or run the cells one by one.
 4. Every cell prints a ▶ line when it starts and a ✅ (or ❌) line when it ends. Step 4 prints a
    status line every 30 seconds while it generates.
@@ -45,6 +47,11 @@ import os
 PILOT = True  # True: ~1,000 messages to check quality. False: the full run (~40,000 messages).
 N_REQUESTS = 100 if PILOT else 4000  # per generator; each request asks for 5 messages
 
+# False (default): use Kaggle's own PyTorch + transformers. Nothing big is installed, so nothing breaks.
+# True: also try vLLM (much faster) in a separate virtual environment, falling back to transformers.
+# Never pip-install vLLM into the main environment: it replaces Kaggle's PyTorch and breaks transformers.
+USE_VLLM = False
+
 GENERATORS = [
     # Apache-2.0 (checked 18 Oct 2026). AWQ fits one T4; the 4-bit fallback is for transformers.
     dict(generator="qwen2.5-7b", model="Qwen/Qwen2.5-7B-Instruct-AWQ", quantization="awq",
@@ -58,35 +65,57 @@ OUT_DIR = "/kaggle/working/synthetic" if os.path.isdir("/kaggle/working") else "
 os.makedirs(OUT_DIR, exist_ok=True)
 print(f"   mode: {'PILOT' if PILOT else 'FULL RUN'} · {N_REQUESTS} requests x 5 messages per model")
 print(f"   models: {', '.join(g['generator'] for g in GENERATORS)}")
+print(f"   engine: {'vLLM (isolated) with transformers fallback' if USE_VLLM else 'transformers'}")
 print(f"   output folder: {OUT_DIR}")
 print("✅ Step 1 done")
 """
 
-INSTALL = """print("▶ Step 2/5: checking GPUs and installing vLLM (usually 3-6 minutes)...")
+INSTALL = """print("▶ Step 2/5: checking the GPU environment")
 import subprocess, sys
 
-gpu = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-                     capture_output=True, text=True)
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+def last_line(result):
+    return (result.stderr.strip().splitlines() or result.stdout.strip().splitlines() or ["?"])[-1]
+
+gpu = run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"])
 print("   GPUs:", gpu.stdout.strip().replace("\\n", " | ") or "NONE FOUND: turn on a GPU accelerator")
 
-pip = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm", "bitsandbytes"],
-                     capture_output=True, text=True)
-if "dependency conflicts" in pip.stderr:
-    print("   note: pip reported conflicts with Kaggle's preinstalled packages (bigframes, cuml, ...).")
-    print("         Expected and harmless: this notebook doesn't use them.")
-if pip.returncode != 0:
-    print("   ⚠ pip install failed; last lines:")
-    print("\\n".join(pip.stderr.strip().splitlines()[-10:]))
+# bitsandbytes (4-bit loading) is the only addition, and --no-deps stops it touching Kaggle's PyTorch.
+if run([sys.executable, "-c", "import bitsandbytes"]).returncode != 0:
+    print("   installing bitsandbytes (without touching PyTorch)...")
+    run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "bitsandbytes"])
 
-check = subprocess.run([sys.executable, "-c", "import vllm; print(vllm.__version__)"],
-                       capture_output=True, text=True)
-if check.returncode == 0:
-    print(f"   vLLM {check.stdout.strip()} installed (fast path)")
-    print("✅ Step 2 done")
-else:
-    print("   ⚠ vLLM can't be imported; generation will use the slower transformers fallback.")
-    print("     Last error line:", (check.stderr.strip().splitlines() or ["?"])[-1])
-    print("✅ Step 2 done (with fallback)")
+# Load the actual model classes now, so a broken environment fails here in seconds, not in step 4.
+probe = run([sys.executable, "-c",
+             "import torch, transformers, bitsandbytes, accelerate;"
+             "from transformers import Qwen2ForCausalLM, Phi3ForCausalLM;"
+             "print(f'PyTorch {torch.__version__} (CUDA {torch.version.cuda}), "
+             "transformers {transformers.__version__}, bitsandbytes {bitsandbytes.__version__}, "
+             "GPU available: {torch.cuda.is_available()}')"])
+if probe.returncode != 0:
+    print("❌ Step 2 failed: PyTorch/transformers can't load the models in this session.")
+    print("   Error:", last_line(probe))
+    print("   Fix: restart the session so Kaggle restores its packages (power icon at the top, or")
+    print("   Run > Restart & clear cell outputs; on Colab, Runtime > Disconnect and delete runtime),")
+    print("   then Run All again. If it still fails, send this error over.")
+    raise SystemExit("environment check failed")
+print("  ", probe.stdout.strip())
+
+VLLM_PYTHON = None
+if USE_VLLM:
+    print("   USE_VLLM: installing vLLM into its own virtual environment (5-10 minutes)...")
+    venv = "/tmp/vllm-env"
+    run([sys.executable, "-m", "venv", venv])
+    pip = run([f"{venv}/bin/python", "-m", "pip", "install", "-q", "vllm"])
+    check = run([f"{venv}/bin/python", "-c", "import vllm; print(vllm.__version__)"])
+    if check.returncode == 0:
+        VLLM_PYTHON = f"{venv}/bin/python"
+        print(f"   vLLM {check.stdout.strip()} ready (isolated; the main environment is untouched)")
+    else:
+        print("   ⚠ vLLM didn't install or import; using transformers. Reason:", last_line(check))
+print("✅ Step 2 done")
 """
 
 WRITTEN = """print("▶ Step 3/5: checking the generation code")
@@ -97,12 +126,13 @@ print(f"   {len(spec.INTENTS)} intents · {len(spec.STYLES)} writing styles · "
 print("✅ Step 3 done")
 """
 
-RUN = """print("▶ Step 4/5: generating messages (pilot: about 15-30 minutes).")
+RUN = """print("▶ Step 4/5: generating messages (pilot: about 20-40 minutes with transformers).")
 print("   A status line prints every 30 seconds. Re-run this cell if a session times out: it resumes.")
 import subprocess, sys, time, torch
 
-def command(g):
-    cmd = [sys.executable, "-u", "gen.py", "--generator", g["generator"], "--model", g["model"],
+def command(g, python, backend):
+    cmd = [python, "-u", "gen.py", "--generator", g["generator"], "--model", g["model"],
+           "--backend", backend,
            "--n-requests", str(N_REQUESTS), "--out", f"{OUT_DIR}/{g['generator']}.jsonl"]
     if g["quantization"]:
         cmd += ["--quantization", g["quantization"]]
@@ -137,35 +167,51 @@ def watch(running, started):
             print(f"   [{minutes:02d}:{seconds:02d}] {g['generator']:<11} {messages_written(g):>6,} msgs · "
                   f"{state} · {latest_status(g)}", flush=True)
 
-def launch(g, gpu_index):
+def launch(g, gpu_index, python, backend):
     env = {**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu_index), "PYTHONUNBUFFERED": "1"}
     log = open(f"{OUT_DIR}/{g['generator']}.log", "a")
-    print(f"   started {g['generator']} on GPU {gpu_index}", flush=True)
-    return g, subprocess.Popen(command(g), env=env, stdout=log, stderr=subprocess.STDOUT)
+    print(f"   started {g['generator']} on GPU {gpu_index} with {backend}", flush=True)
+    proc = subprocess.Popen(command(g, python, backend), env=env, stdout=log, stderr=subprocess.STDOUT)
+    return g, proc
+
+def run_phase(models, python, backend):
+    # Run models (in parallel when there are 2+ GPUs); return the ones that failed.
+    failed = []
+    if gpus >= 2:
+        running = [launch(g, i, python, backend) for i, g in enumerate(models)]
+        watch(running, started)
+    else:
+        running = []
+        for g in models:
+            one = [launch(g, 0, python, backend)]
+            watch(one, started)
+            running += one
+    for g, proc in running:
+        if proc.returncode != 0:
+            print(f"   {g['generator']} stopped with exit code {proc.returncode} ({backend})")
+            failed.append(g)
+    return failed
 
 gpus = torch.cuda.device_count()
 print(f"   {gpus} GPU(s): running {'both models in parallel' if gpus >= 2 else 'the models one after the other'}")
 started = time.time()
-finished = []
-if gpus >= 2:
-    running = [launch(g, i) for i, g in enumerate(GENERATORS)]
-    watch(running, started)
-    finished += running
-else:
-    for g in GENERATORS:
-        running = [launch(g, 0)]
-        watch(running, started)
-        finished += running
+todo = list(GENERATORS)
+if VLLM_PYTHON:
+    todo = run_phase(todo, VLLM_PYTHON, "vllm")
+    if todo:
+        print("   switching those to transformers; finished requests are kept and skipped")
+if todo:
+    todo = run_phase(todo, sys.executable, "transformers")
 
 print(f"   all models finished in {(time.time() - started) / 60:.0f} min")
 ok = True
-for g, proc in finished:
+for g in GENERATORS:
     count = messages_written(g)
-    if proc.returncode == 0 and count > 0:
+    if g not in todo and count > 0:
         print(f"   ✓ {g['generator']}: {count:,} messages · {latest_status(g)}")
     else:
         ok = False
-        print(f"   ✗ {g['generator']}: exit code {proc.returncode}, {count:,} messages. Last log lines:")
+        print(f"   ✗ {g['generator']}: {count:,} messages. Last log lines:")
         with open(f"{OUT_DIR}/{g['generator']}.log", encoding="utf-8", errors="replace") as fh:
             print("".join(fh.readlines()[-20:]))
 print("✅ Step 4 done" if ok else "❌ Step 4 had a problem: copy the log lines above and send them over")
