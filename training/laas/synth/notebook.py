@@ -87,21 +87,40 @@ if run([sys.executable, "-c", "import bitsandbytes"]).returncode != 0:
     print("   installing bitsandbytes (without touching PyTorch)...")
     run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "bitsandbytes"])
 
-# Load the actual model classes now, so a broken environment fails here in seconds, not in step 4.
-probe = run([sys.executable, "-c",
-             "import torch, transformers, bitsandbytes, accelerate;"
-             "from transformers import Qwen2ForCausalLM, Phi3ForCausalLM;"
-             "print(f'PyTorch {torch.__version__} (CUDA {torch.version.cuda}), "
-             "transformers {transformers.__version__}, bitsandbytes {bitsandbytes.__version__}, "
-             "GPU available: {torch.cuda.is_available()}')"])
+# Import the real model modules now, so a broken environment fails here in seconds, not in step 4.
+# Importing the modules directly (not via `from transformers import ...`) shows the real error
+# instead of transformers' generic "Could not import module" wrapper.
+PROBE = '''
+import importlib, sys, traceback
+try:
+    import torch, transformers
+    print(f"PyTorch {torch.__version__} (CUDA {torch.version.cuda}) · transformers {transformers.__version__}"
+          f" · GPU available: {torch.cuda.is_available()}", flush=True)
+    try:
+        import torchvision
+        print(f"torchvision {torchvision.__version__}", flush=True)
+    except Exception as exc:
+        print(f"torchvision: not usable ({type(exc).__name__}: {exc})", flush=True)
+    for name in ("accelerate", "bitsandbytes",
+                 "transformers.models.qwen2.modeling_qwen2", "transformers.models.phi3.modeling_phi3"):
+        importlib.import_module(name)
+        print(f"ok: {name}", flush=True)
+except Exception:
+    traceback.print_exc()
+    sys.exit(1)
+'''
+probe = run([sys.executable, "-c", PROBE])
+for line in probe.stdout.strip().splitlines():
+    print("  ", line)
 if probe.returncode != 0:
     print("❌ Step 2 failed: PyTorch/transformers can't load the models in this session.")
-    print("   Error:", last_line(probe))
-    print("   Fix: restart the session so Kaggle restores its packages (power icon at the top, or")
-    print("   Run > Restart & clear cell outputs; on Colab, Runtime > Disconnect and delete runtime),")
-    print("   then Run All again. If it still fails, send this error over.")
+    print("   Real error (last lines):")
+    print("\\n".join("     " + l for l in probe.stderr.strip().splitlines()[-12:]))
+    print("   Fix 1: fully reset the session: click the power icon at the top and wait for")
+    print("          'Session off' (or Run > Factory reset), then Run All. Restarting the kernel")
+    print("          alone does NOT undo packages installed earlier.")
+    print("   Fix 2: if it still fails after a full reset, send these lines over.")
     raise SystemExit("environment check failed")
-print("  ", probe.stdout.strip())
 
 VLLM_PYTHON = None
 if USE_VLLM:
