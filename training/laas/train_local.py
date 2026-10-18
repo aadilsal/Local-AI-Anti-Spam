@@ -128,6 +128,37 @@ def evaluate(
     }
 
 
+def synthetic_share_weights(
+    labels: npt.NDArray[np.int_], synthetic: npt.NDArray[np.bool_], share: float
+) -> tuple[npt.NDArray[np.float64], dict[str, dict[str, float]]]:
+    """Weights that give synthetic rows the same share of each class's total weight (R15).
+
+    Without this, generator-written text sits mostly on one side (the pilot: ~23% of spam but ~0.7%
+    of ham), so "sounds generated" becomes a label signal. With an equal share in both classes the
+    generator's style says nothing about the label. Each class keeps its total weight; a class with
+    no synthetic (or no real) rows is left unweighted.
+    """
+    weights = np.ones(len(labels), dtype=np.float64)
+    info: dict[str, dict[str, float]] = {}
+    for cls, name in ((0, "ham"), (1, "spam")):
+        in_class = labels == cls
+        syn, real = in_class & synthetic, in_class & ~synthetic
+        n_syn, n_real, n = int(syn.sum()), int(real.sum()), int(in_class.sum())
+        before = n_syn / n if n else 0.0
+        after = before
+        if n_syn and n_real:
+            weights[syn] = share * n / n_syn
+            weights[real] = (1 - share) * n / n_real
+            after = share
+        info[name] = {
+            "synthetic": n_syn,
+            "real": n_real,
+            "share_before": before,
+            "share_after": after,
+        }
+    return weights, info
+
+
 def _fmt(r: dict[str, float]) -> str:
     return f"{r['value']:.2%} [{r['low']:.2%}, {r['high']:.2%}]"
 
@@ -146,6 +177,15 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
         f"Calibration fitted as if {meta['calib_spam_share']:.0%} of messages were spam "
         "(scores mean P(spam) at that mix; thresholds are set on ham scores, so they don't move). "
         f"Held-out sources (never trained on): {', '.join(meta['holdout']) or 'none'}.",
+        "",
+        "Synthetic share of training weight (R15: equal in both classes, so the generator's style "
+        "isn't a label signal): "
+        + ", ".join(
+            f"{k} {v['share_before']:.1%} of {v['synthetic'] + v['real']:,.0f} rows "
+            f"-> {v['share_after']:.1%}"
+            for k, v in meta["synthetic_balance"].items()
+        )
+        + ".",
         "",
         "> Not the PRD gate: no metric here is measured on real contact-form messages.",
         "",
@@ -217,7 +257,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Spam share the calibrated scores should assume (real contact-form mix; 0.5 until "
         "the hand-labelled set exists). Thresholds are unaffected.",
     )
+    parser.add_argument(
+        "--synthetic-share",
+        default="auto",
+        help="Share of each class's training weight given to synthetic rows, the same for ham "
+        "and spam so the generator's style carries no label signal (R15). 'auto' = 0.5 when "
+        "synthetic rows are present; 'off' = no reweighting; or a number between 0 and 1.",
+    )
     args = parser.parse_args(argv)
+    if args.synthetic_share not in ("auto", "off"):
+        try:
+            if not 0 < float(args.synthetic_share) < 1:
+                raise ValueError
+        except ValueError:
+            parser.error("--synthetic-share must be 'auto', 'off' or a number between 0 and 1")
 
     n_buckets = 1 << args.bucket_bits
     rng = np.random.default_rng(args.seed)
@@ -276,10 +329,33 @@ def main(argv: list[str] | None = None) -> int:
         stds = np.where(stds > 1e-12, stds, 1.0)
         y_train = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
 
+        is_synthetic = np.asarray(
+            pc.starts_with(train.column("source"), "synthetic_").to_numpy(zero_copy_only=False),
+            dtype=np.bool_,
+        )
+        share = 0.5 if args.synthetic_share == "auto" else args.synthetic_share
+        if share == "off" or not is_synthetic.any():
+            sample_weight = np.ones(len(y_train))
+            _, balance = synthetic_share_weights(y_train, is_synthetic, 0.5)
+            for side in balance.values():
+                side["share_after"] = side["share_before"]
+        else:
+            sample_weight, balance = synthetic_share_weights(y_train, is_synthetic, float(share))
+        log(
+            "Synthetic share of training weight: "
+            + ", ".join(
+                f"{k} {v['share_before']:.1%} -> {v['share_after']:.1%}" for k, v in balance.items()
+            )
+        )
+
         model = LogisticRegression(
             C=args.C, solver="liblinear", class_weight="balanced", max_iter=500
         )
-        model.fit(sp.hstack([x_train, sp.csr_matrix((d_train - means) / stds)]).tocsr(), y_train)
+        model.fit(
+            sp.hstack([x_train, sp.csr_matrix((d_train - means) / stds)]).tocsr(),
+            y_train,
+            sample_weight=sample_weight,
+        )
         w = model.coef_[0].astype(np.float32).astype(np.float64)  # what model.bin will hold
         bias = float(model.intercept_[0])
 
@@ -344,6 +420,7 @@ def main(argv: list[str] | None = None) -> int:
         "featurize_and_train_seconds": round(seconds, 1),
         "holdout": args.holdout,
         "calib_spam_share": args.calib_spam_share,
+        "synthetic_balance": balance,
         "val_spam_share": val_share,
     }
     out = args.runs / f"{stamp:%Y%m%d-%H%M%S}-{args.mode}"

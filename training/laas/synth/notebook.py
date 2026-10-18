@@ -35,8 +35,10 @@ this notebook by hand.
 5. When it finishes: tab **Output**, download `synthetic.zip`, and unzip it into
    `training/data/synthetic/` in the repo.
 
-**On Colab:** Runtime, Change runtime type, **T4 GPU**, then Run all. The output is under
-`/content/synthetic`; download `synthetic.zip` from the file browser.
+**On Colab:** Runtime, Change runtime type, **T4 GPU**, then Run all, and approve the Google Drive
+popup. Output goes to `MyDrive/laas-synthetic` in your Google Drive, so a disconnect loses nothing:
+just Run all again and it resumes. The zip downloads automatically at the end (it's also in Drive).
+The data is usable at any point: stop whenever you have enough.
 
 Only invented messages are generated here. Never upload real beta-site messages to Kaggle or Colab.
 """
@@ -61,7 +63,16 @@ GENERATORS = [
          fallback_model="microsoft/Phi-4-mini-instruct", fallback_4bit=False),
 ]
 
-OUT_DIR = "/kaggle/working/synthetic" if os.path.isdir("/kaggle/working") else "/content/synthetic"
+if os.path.isdir("/kaggle/working"):
+    OUT_DIR = "/kaggle/working/synthetic"
+else:
+    try:  # Colab wipes its disk on disconnect; Google Drive keeps the output so runs can resume.
+        from google.colab import drive
+        print("   Colab: connecting Google Drive so progress survives disconnects (approve the popup)")
+        drive.mount("/content/drive")
+        OUT_DIR = "/content/drive/MyDrive/laas-synthetic"
+    except ImportError:
+        OUT_DIR = os.path.abspath("synthetic")
 os.makedirs(OUT_DIR, exist_ok=True)
 print(f"   mode: {'PILOT' if PILOT else 'FULL RUN'} · {N_REQUESTS} requests x 5 messages per model")
 print(f"   models: {', '.join(g['generator'] for g in GENERATORS)}")
