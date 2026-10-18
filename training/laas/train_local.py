@@ -221,8 +221,15 @@ def main(argv: list[str] | None = None) -> int:
 
     n_buckets = 1 << args.bucket_bits
     rng = np.random.default_rng(args.seed)
+
+    def locate(path: Path) -> Path:
+        # Relative paths work from the repo root as well as from training/.
+        if path.exists() or path.is_absolute() or not (TRAINING_DIR / path).exists():
+            return path
+        return TRAINING_DIR / path
+
     full = pa.concat_tables(
-        [pq.read_table(path, columns=COLUMNS) for path in [args.data, *args.extra]]
+        [pq.read_table(locate(path), columns=COLUMNS) for path in [args.data, *args.extra]]
     )
     full = full.filter(pc.equal(full.column("language"), "en"))
     production = args.mode == "production"
