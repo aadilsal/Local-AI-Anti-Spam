@@ -1,16 +1,0 @@
-[10:33:03] phi-4-mini: 100 requests, 0 already done, 100 to go
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-[transformers] This model config has set a `rope_parameters['original_max_position_embeddings']` field, to be used together with `max_position_embeddings` to determine a scaling factor. Please set the `factor` field of `rope_parameters`with this ratio instead -- we recommend the use of this field over `original_max_position_embeddings`, as it is compatible with most model architectures.
-[10:33:13] STAGE loading microsoft/Phi-4-mini-instruct with transformers (4-bit: False)
-[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
-Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [01:08<01:08, 68.94s/it]Fetching 2 files: 100%|██████████| 2/2 [01:32<00:00, 42.11s/it]Fetching 2 files: 100%|██████████| 2/2 [01:32<00:00, 46.14s/it]
-Loading weights:   0%|          | 0/194 [00:00<?, ?it/s]Loading weights:   1%|          | 1/194 [00:18<58:40, 18.24s/it]Loading weights:  67%|██████▋   | 130/194 [00:18<00:06,  9.59it/s]Loading weights:  76%|███████▋  | 148/194 [00:22<00:05,  8.48it/s]Loading weights:  80%|████████  | 156/194 [00:23<00:04,  8.65it/s]Loading weights:  83%|████████▎ | 161/194 [00:24<00:04,  7.88it/s]Loading weights:  86%|████████▌ | 166/194 [00:25<00:03,  7.47it/s]Loading weights:  89%|████████▊ | 172/194 [00:26<00:03,  7.14it/s]Loading weights:  92%|█████████▏| 178/194 [00:27<00:02,  6.94it/s]Loading weights:  95%|█████████▍| 184/194 [00:28<00:01,  6.67it/s]Loading weights:  98%|█████████▊| 190/194 [00:28<00:00,  7.33it/s]Loading weights: 100%|██████████| 194/194 [00:28<00:00,  6.69it/s]
-[10:35:25] STAGE model loaded in 132s; generating
-[10:36:41] PROGRESS batch 1/7 (16 requests in 76s): 78 messages so far
-[10:38:55] PROGRESS batch 2/7 (16 requests in 134s): 148 messages so far
-[10:41:37] PROGRESS batch 3/7 (16 requests in 162s): 209 messages so far
-[10:46:31] PROGRESS batch 4/7 (16 requests in 295s): 279 messages so far
-[10:47:57] PROGRESS batch 5/7 (16 requests in 85s): 349 messages so far
-[10:52:50] PROGRESS batch 6/7 (16 requests in 294s): 429 messages so far
-[10:53:12] PROGRESS batch 7/7 (4 requests in 22s): 449 messages so far
-[10:53:12] Done with transformers: 449 messages

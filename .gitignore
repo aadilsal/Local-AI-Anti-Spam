@@ -6,12 +6,11 @@ document/dev-plan.md
 data/real/
 training/data/real/
 
-# Raw downloads and generated datasets
+# All datasets: raw downloads, real, synthetic and processed. The whole folder is ignored so a file
+# dropped straight into training/data/ can't be committed by accident (it happened once).
 DataSet/
-data/raw/
-training/data/raw/
-training/data/processed/
-training/data/synthetic/
+data/
+training/data/
 training/runs/
 plugin/tests/bench/tmp/
 
