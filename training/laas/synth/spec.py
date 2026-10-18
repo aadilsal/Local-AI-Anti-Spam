@@ -19,7 +19,10 @@ import random
 import re
 from dataclasses import asdict, dataclass
 
-PROMPT_VERSION = 1
+# v2 (18 Oct 2026, after the pilot review): genuine writers sometimes include links and emails (v1
+# had none, which would teach "link = spam"); spam briefs say who is selling to whom (v1's loan
+# offers came out as customers asking for loans); stricter artefact filter.
+PROMPT_VERSION = 2
 MESSAGES_PER_REQUEST = 5
 
 # (business, what a customer would contact it about). At least 20 types (PRD D6).
@@ -305,7 +308,9 @@ INTENTS = [
         "spam",
         "bot",
         "contact_form",
-        "offers business loans, funding or merchant cash advances with instant approval",
+        "a lender or broker cold-pitching business loans, funding or merchant cash advances with "
+        "'instant approval' to the business owner (the writer is offering money, not asking "
+        "for it)",
         0.4,
         _SPAMMY_STYLES,
     ),
@@ -368,7 +373,19 @@ def template_id(intent: Intent, style: Style) -> str:
 def user_prompt(
     intent: Intent, style: Style, business: tuple[str, str], locale: tuple[str, str]
 ) -> str:
-    who = "a spammer or scammer" if intent.label == "spam" else "a real person"
+    if intent.label == "spam":
+        who = f"a spammer or scammer writing TO the {business[0]} (not one of its customers)"
+        extras = (
+            "Some messages include a link, an email address or a phone number; others ask for a "
+            "reply instead."
+        )
+    else:
+        who = f"a real customer or reader of the {business[0]}"
+        # Without this, genuine messages never contain links and the model learns "link = spam".
+        extras = (
+            "About one in four writers mentions a link (their own website, a photo album, a "
+            "listing or the product page they mean) or adds their email address; the rest don't."
+        )
     where = (
         "the contact form on the website"
         if intent.channel == "contact_form"
@@ -379,6 +396,7 @@ def user_prompt(
         f"Business: a {business[0]} ({business[1]}).\n"
         f"Where the message is posted: {where}.\n"
         f"Who writes it: {who}. What it is: {intent.description}.\n"
+        f"{extras}\n"
         f"Writing style: {style.description}.\n"
         f"Length: about {low}-{high} words each.\n"
         f"Locale: {locale[0]}: {locale[1]}.\n\n"
@@ -434,7 +452,14 @@ _REFUSALS = (
     "[name]",
     "[your name]",
     "lorem ipsum",
+    "language model",
 )
+# The model's own scaffolding at the start of a message ("1.", "Message 2:", "Subject:"); a numbered
+# list inside a genuine email is fine, so only the start is checked.
+_LEADING_LABEL = re.compile(
+    r"^\s*((message|email|comment|msg)\s*#?\d+\s*[:.)-]|\d+[.)]\s|subject\s*:)", re.I
+)
+_PLACEHOLDER = re.compile(r"\[[A-Z][A-Za-z ]{1,25}\]|\{\{?[A-Za-z_ ]{2,25}\}?\}")
 
 
 def parse_response(text: str) -> list[str]:
@@ -458,13 +483,15 @@ def parse_response(text: str) -> list[str]:
 
 
 def clean_messages(texts: list[str]) -> list[str]:
-    """Drop empty, refusal-like, placeholder and duplicate messages."""
+    """Drop empty, refusal-like, placeholder, scaffolded and duplicate messages."""
     seen: set[str] = set()
     out = []
     for text in texts:
         text = text.strip()
         key = " ".join(text.lower().split())
         if len(key) < 3 or key in seen or any(marker in key for marker in _REFUSALS):
+            continue
+        if _LEADING_LABEL.match(text) or _PLACEHOLDER.search(text):
             continue
         seen.add(key)
         out.append(text)

@@ -12,6 +12,7 @@ from laas.synth.ingest import UnknownGeneratorError, load_synthetic, split_for
 from laas.synth.spec import (
     BUSINESSES,
     INTENTS,
+    PROMPT_VERSION,
     STYLE_BY_KEY,
     build_requests,
     clean_messages,
@@ -35,7 +36,15 @@ def test_each_request_uses_a_style_its_intent_allows() -> None:
     for r in build_requests(2000, seed=2, generator="phi-4-mini"):
         assert r.style in intents[r.intent].styles
         assert r.style in STYLE_BY_KEY
-        assert r.template_id == f"p1:{r.channel}:{r.intent}:{r.style}"
+        assert r.template_id == f"p{PROMPT_VERSION}:{r.channel}:{r.intent}:{r.style}"
+
+
+def test_ham_prompts_ask_for_some_links_and_spam_prompts_say_who_sells() -> None:
+    reqs = build_requests(400, seed=4, generator="qwen2.5-7b")
+    ham = next(r for r in reqs if r.label == "ham").messages[1][1]
+    spam = next(r for r in reqs if r.label == "spam").messages[1][1]
+    assert "one in four writers mentions a link" in ham  # pilot review: no links in v1 ham
+    assert "writing TO the" in spam and "not one of its customers" in spam
 
 
 def test_generators_get_different_requests() -> None:
@@ -63,10 +72,18 @@ def test_clean_messages_drops_junk_but_keeps_real_phrasing() -> None:
         "Here are photos of the leak under the sink.",
         "As an AI, I can't write spam.",
         "Hi [Name], great site",
+        "Hi {name}, quick question about your SEO",
+        "1. Hi, can I book a table?",
+        "Message 2: Do you deliver to Leeds?",
+        "Subject: Quote request\nHi, how much for a boiler service?",
         "  ",
         "here are photos of the leak under the sink.",  # duplicate after normalising
+        "Hi, two questions:\n1. Do you work weekends?\n2. Do you cover Leeds?",  # a real list
     ]
-    assert clean_messages(texts) == ["Here are photos of the leak under the sink."]
+    assert clean_messages(texts) == [
+        "Here are photos of the leak under the sink.",
+        "Hi, two questions:\n1. Do you work weekends?\n2. Do you cover Leeds?",
+    ]
 
 
 def _row(generator: str, text: str, template: str = "p1:contact_form:booking:short_note") -> str:

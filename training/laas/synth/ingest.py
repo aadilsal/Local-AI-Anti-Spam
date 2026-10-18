@@ -24,6 +24,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from laas.data.schema import SCHEMA, SplitPolicy
+from laas.synth.spec import clean_messages
 
 TRAINING_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_IN = TRAINING_DIR / "data" / "synthetic"
@@ -65,6 +66,8 @@ def load_synthetic(paths: list[Path]) -> pa.Table:
                 text = r["text"].strip()
                 key = " ".join(text.lower().split())
                 if key in seen:  # exact duplicates across generators and requests
+                    continue
+                if not clean_messages([text]):  # same filter as generation, for older outputs too
                     continue
                 seen.add(key)
                 values = {
