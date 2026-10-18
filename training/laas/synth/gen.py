@@ -70,8 +70,11 @@ def write(fh: TextIO, req: Request, reply: str, args: argparse.Namespace, checkp
 
 
 def run_vllm(reqs: Sequence[Request], args: argparse.Namespace, fh: TextIO) -> int:
+    log("STAGE importing vLLM")
     from vllm import LLM, SamplingParams
 
+    log(f"STAGE loading {args.model} with vLLM (the first run downloads it: a few minutes)")
+    started = time.time()
     llm = LLM(
         model=args.model,
         dtype="half",  # T4 GPUs have no bfloat16
@@ -80,18 +83,25 @@ def run_vllm(reqs: Sequence[Request], args: argparse.Namespace, fh: TextIO) -> i
         gpu_memory_utilization=0.90,
         seed=args.seed,
     )
+    log(f"STAGE model loaded in {time.time() - started:.0f}s; generating")
     tokenizer = llm.get_tokenizer()
     params = SamplingParams(temperature=args.temperature, top_p=0.95, max_tokens=args.max_tokens)
     total = 0
+    n_batches = -(-len(reqs) // args.batch)
     for i, chunk in enumerate(batches(reqs, args.batch)):
+        batch_started = time.time()
         prompts = [
             tokenizer.apply_chat_template(r.chat(), tokenize=False, add_generation_prompt=True)
             for r in chunk
         ]
-        for req, out in zip(chunk, llm.generate(prompts, params), strict=True):
+        outputs = llm.generate(prompts, params, use_tqdm=False)
+        for req, out in zip(chunk, outputs, strict=True):
             total += write(fh, req, out.outputs[0].text, args, args.model)
         fh.flush()
-        log(f"vLLM batch {i + 1}: {total:,} messages so far")
+        log(
+            f"PROGRESS batch {i + 1}/{n_batches} ({len(chunk)} requests in "
+            f"{time.time() - batch_started:.0f}s): {total:,} messages so far"
+        )
     return total
 
 
@@ -111,9 +121,14 @@ def run_transformers(reqs: Sequence[Request], args: argparse.Namespace, fh: Text
         kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16
         )
+    log(f"STAGE loading {checkpoint} with transformers (4-bit: {args.fallback_4bit})")
+    started = time.time()
     model = AutoModelForCausalLM.from_pretrained(checkpoint, **kwargs)
+    log(f"STAGE model loaded in {time.time() - started:.0f}s; generating")
     total = 0
+    n_batches = -(-len(reqs) // args.hf_batch)
     for i, chunk in enumerate(batches(reqs, args.hf_batch)):
+        batch_started = time.time()
         prompts = [
             tokenizer.apply_chat_template(r.chat(), tokenize=False, add_generation_prompt=True)
             for r in chunk
@@ -134,7 +149,10 @@ def run_transformers(reqs: Sequence[Request], args: argparse.Namespace, fh: Text
         for req, reply in zip(chunk, replies, strict=True):
             total += write(fh, req, reply, args, checkpoint)
         fh.flush()
-        log(f"transformers batch {i + 1}: {total:,} messages so far")
+        log(
+            f"PROGRESS batch {i + 1}/{n_batches} ({len(chunk)} requests in "
+            f"{time.time() - batch_started:.0f}s): {total:,} messages so far"
+        )
     return total
 
 
@@ -149,7 +167,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--n-requests", type=int, default=200)
     parser.add_argument("--seed", type=int, default=20261018)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--batch", type=int, default=256)
+    # Small enough that progress shows every minute or two; vLLM still batches efficiently.
+    parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--hf-batch", type=int, default=16)
     parser.add_argument("--max-tokens", type=int, default=1600)
     parser.add_argument("--max-model-len", type=int, default=4096)

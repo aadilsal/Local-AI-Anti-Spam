@@ -41,6 +41,8 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 "laas/featurize.py" = ["RUF001"]
 "laas/parity.py" = ["RUF001"]
 "tests/test_inference.py" = ["RUF001", "RUF003"]
+# Cell code is embedded as strings and laid out for a wide notebook, not a 100-column editor.
+"laas/synth/notebook.py" = ["E501"]
 
 [tool.mypy]
 strict = true
