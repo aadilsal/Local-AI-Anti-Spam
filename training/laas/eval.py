@@ -56,16 +56,30 @@ def rates_at(scores: FloatArray, labels: IntArray, threshold: float) -> dict[str
     }
 
 
-def ece(probs: FloatArray, labels: IntArray, bins: int = 10) -> float:
-    """Expected calibration error with equal-width bins."""
+def ece(
+    probs: FloatArray, labels: IntArray, bins: int = 10, weights: FloatArray | None = None
+) -> float:
+    """Expected calibration error with equal-width bins, optionally reweighted to a target mix."""
+    w = np.ones(len(probs)) if weights is None else weights
     edges = np.linspace(0.0, 1.0, bins + 1)
     idx = np.clip(np.digitize(probs, edges[1:-1]), 0, bins - 1)
-    total = 0.0
+    total, mass = 0.0, float(w.sum())
     for b in range(bins):
         mask = idx == b
         if mask.any():
-            total += mask.mean() * abs(float(probs[mask].mean()) - float(labels[mask].mean()))
+            wb = w[mask]
+            gap = np.average(probs[mask], weights=wb) - np.average(labels[mask], weights=wb)
+            total += float(wb.sum()) / mass * abs(float(gap))
     return total
+
+
+def mix_weights(labels: IntArray, spam_share: float) -> FloatArray:
+    """Per-row weights that make ``labels`` look as if ``spam_share`` of rows were spam."""
+    share = float(labels.mean())
+    if share in (0.0, 1.0):
+        return np.ones(len(labels))
+    out: FloatArray = np.where(labels == 1, spam_share / share, (1 - spam_share) / (1 - share))
+    return out
 
 
 def roc_auc(scores: FloatArray, labels: IntArray) -> float:

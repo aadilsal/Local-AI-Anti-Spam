@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from laas.eval import ece, roc_auc, threshold_at_fpr, wilson
+from laas.eval import ece, mix_weights, roc_auc, threshold_at_fpr, wilson
 from laas.featurize import MAX_BYTES, featurize, normalise, registrable_domain
 from laas.model_file import read_model, write_model
 
@@ -95,6 +95,16 @@ def test_threshold_at_fpr_respects_the_limit() -> None:
     t = threshold_at_fpr(scores, labels, 0.005)
     fpr = ((scores >= t) & (labels == 0)).sum() / (labels == 0).sum()
     assert fpr <= 0.005
+
+
+def test_mix_weights_reweight_to_target_share() -> None:
+    labels = np.array([1] + [0] * 99)  # 1% spam
+    w = mix_weights(labels, 0.5)
+    assert np.isclose(w[labels == 1].sum(), w[labels == 0].sum())  # now looks like 50% spam
+    # Scores of 0.5 everywhere are perfectly calibrated at a 50/50 mix, badly at the raw 1% mix.
+    probs = np.full(100, 0.5)
+    assert ece(probs, labels, weights=w) == pytest.approx(0.0)
+    assert ece(probs, labels) == pytest.approx(0.49)
 
 
 def test_auc_and_ece_on_perfect_scores() -> None:

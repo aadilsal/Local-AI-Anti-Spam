@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import scipy.sparse as sp
@@ -33,9 +34,11 @@ from laas.eval import (
     Rate,
     ece,
     keyword_baseline,
+    mix_weights,
     rates_at,
     roc_auc,
     threshold_at_fpr,
+    wilson,
 )
 from laas.featurize import DENSE_NAMES, featurize
 from laas.model_file import write_model
@@ -45,6 +48,8 @@ DEFAULT_DATA = TRAINING_DIR / "data" / "processed" / "corpus_v1.parquet"
 DEFAULT_RUNS = TRAINING_DIR / "runs"
 COLUMNS = ["text", "label_id", "split_policy", "corpus_split", "language", "source", "domain"]
 EVAL_BATCH = 5000
+GATE_FPR = 0.005  # PRD §9.4: false-positive rate on real enquiries, per ham domain (R14)
+GATE_MIN_HAM = 50  # fewer ham rows than this can't say anything about a 0.5% rate
 
 
 def _featurize_one(
@@ -85,6 +90,7 @@ def evaluate(
     domains: list[str],
     t_low: float,
     t_high: float,
+    spam_share: float,
 ) -> dict[str, Any]:
     kw = keyword_baseline(texts)
     flagged = probs >= t_high
@@ -92,12 +98,21 @@ def evaluate(
     caught = Counter(s for s, y, f in zip(sources, labels, flagged, strict=True) if y == 1 and f)
     ham_dom = Counter(d for d, y in zip(domains, labels, strict=True) if y == 0)
     fp_dom = Counter(d for d, y, f in zip(domains, labels, flagged, strict=True) if y == 0 and f)
+    gates = {}
+    for domain, n in ham_dom.most_common():
+        if n >= GATE_MIN_HAM:
+            r = wilson(fp_dom[domain], n)
+            gates[domain] = {
+                **_rate(r),
+                "pass": r.value <= GATE_FPR,  # point estimate within the gate
+                "proven": r.high <= GATE_FPR,  # whole 95% interval within the gate (R4)
+            }
     return {
         "name": name,
         "n_ham": int((labels == 0).sum()),
         "n_spam": int((labels == 1).sum()),
         "roc_auc": roc_auc(probs, labels),
-        "ece": ece(probs, labels),
+        "ece": ece(probs, labels, weights=mix_weights(labels, spam_share)),  # at the calibrated mix
         "at_t_high": {k: _rate(v) for k, v in rates_at(probs, labels, t_high).items()},
         "at_t_low": {k: _rate(v) for k, v in rates_at(probs, labels, t_low).items()},
         "oracle_recall_at_fpr": {
@@ -109,6 +124,7 @@ def evaluate(
         },
         "recall_by_source": {s: caught[s] / n for s, n in per_source.most_common()},
         "fpr_by_domain": {d: fp_dom[d] / n for d, n in ham_dom.most_common()},
+        "domain_gates": gates,
     }
 
 
@@ -127,6 +143,10 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
         f"Thresholds from validation: t_low={meta['t_low']:.4f} (<= 5% FPR), "
         f"t_high={meta['t_high']:.4f} (<= 0.5% FPR).",
         "",
+        f"Calibration fitted as if {meta['calib_spam_share']:.0%} of messages were spam "
+        "(scores mean P(spam) at that mix; thresholds are set on ham scores, so they don't move). "
+        f"Held-out sources (never trained on): {', '.join(meta['holdout']) or 'none'}.",
+        "",
         "> Not the PRD gate: no metric here is measured on real contact-form messages.",
         "",
         "| Set | Ham | Spam | AUC | FPR at t_high (95% CI) | Recall at t_high (95% CI) "
@@ -141,6 +161,19 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
             f"| {r['keyword_baseline']['fpr']['value']:.2%} "
             f"| {r['keyword_baseline']['recall']['value']:.2%} |"
         )
+    lines += [
+        "",
+        f"## Per-domain gate: FPR at t_high <= {GATE_FPR:.1%} for each ham domain (R14)",
+        "",
+        "PASS = point estimate within the gate; PROVEN = whole 95% interval within it.",
+        "",
+        "| Set | Domain | Ham | FPR (95% CI) | Result |",
+        "|---|---|---:|---|---|",
+    ]
+    for r in results:
+        for domain, g in r["domain_gates"].items():
+            verdict = "PROVEN" if g["proven"] else ("PASS" if g["pass"] else "**FAIL**")
+            lines.append(f"| {r['name']} | `{domain}` | {g['n']:,} | {_fmt(g)} | {verdict} |")
     for r in results:
         lines += ["", f"## {r['name']}: recall at t_high by spam source", ""]
         lines += [f"- `{s}`: {v:.1%}" for s, v in r["recall_by_source"].items()]
@@ -160,13 +193,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-train-spam", type=int, default=60_000)
     parser.add_argument("--workers", type=int, default=7)
     parser.add_argument("--seed", type=int, default=13)
+    parser.add_argument(
+        "--holdout",
+        action="append",
+        default=[],
+        metavar="SOURCE",
+        help="Leave a source out of training and validation entirely, then report how the model "
+        "does on it: a test on data it has never seen. Repeat for several sources.",
+    )
+    parser.add_argument(
+        "--calib-spam-share",
+        type=float,
+        default=0.5,
+        help="Spam share the calibrated scores should assume (real contact-form mix; 0.5 until "
+        "the hand-labelled set exists). Thresholds are unaffected.",
+    )
     args = parser.parse_args(argv)
 
     n_buckets = 1 << args.bucket_bits
     rng = np.random.default_rng(args.seed)
-    table = pq.read_table(args.data, columns=COLUMNS)
-    table = table.filter(pc.equal(table.column("language"), "en"))
+    full = pq.read_table(args.data, columns=COLUMNS)
+    full = full.filter(pc.equal(full.column("language"), "en"))
     production = args.mode == "production"
+
+    unknown = set(args.holdout) - set(full.column("source").unique().to_pylist())
+    if unknown:
+        parser.error(f"unknown --holdout source(s): {', '.join(sorted(unknown))}")
+    held = pc.is_in(full.column("source"), value_set=pa.array(args.holdout, pa.string()))
+    table = full.filter(pc.invert(held))  # everything training and validation may see
+    holdout = full.filter(held)  # every split of the held-out sources: never trained on
 
     def rows(split: str, trainable_only: bool) -> Any:
         t = table.filter(pc.equal(table.column("corpus_split"), split))
@@ -187,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
         "test (production tier)": rows("test", True),
         "test (all tiers)": rows("test", False),
     }
+    if args.holdout:
+        sets[f"holdout ({', '.join(args.holdout)})"] = holdout
 
     started = time.perf_counter()
 
@@ -229,7 +286,10 @@ def main(argv: list[str] | None = None) -> int:
     y = {
         name: np.asarray(t.column("label_id").to_numpy(), dtype=np.int_) for name, t in sets.items()
     }
-    platt = LogisticRegression(C=1e6).fit(z["val"].reshape(-1, 1), y["val"])
+    # Reweight validation so calibration assumes the target spam share instead of the val mix (R14).
+    val_share = float(y["val"].mean())
+    weights = mix_weights(y["val"], args.calib_spam_share)
+    platt = LogisticRegression(C=1e6).fit(z["val"].reshape(-1, 1), y["val"], sample_weight=weights)
     a, b = float(platt.coef_[0][0]), float(platt.intercept_[0])
     probs = {name: 1 / (1 + np.exp(-(a * v + b))) for name, v in z.items()}
     t_high = threshold_at_fpr(probs["val"], y["val"], 0.005)
@@ -245,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
             sets[name].column("domain").to_pylist(),
             t_low,
             t_high,
+            args.calib_spam_share,
         )
         for name in sets
     ]
@@ -263,6 +324,9 @@ def main(argv: list[str] | None = None) -> int:
         "t_low": t_low,
         "t_high": t_high,
         "featurize_and_train_seconds": round(seconds, 1),
+        "holdout": args.holdout,
+        "calib_spam_share": args.calib_spam_share,
+        "val_spam_share": val_share,
     }
     out = args.runs / f"{stamp:%Y%m%d-%H%M%S}-{args.mode}"
     write_model(
