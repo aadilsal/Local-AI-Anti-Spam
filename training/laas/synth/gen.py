@@ -20,6 +20,7 @@ import argparse
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -164,12 +165,24 @@ def run_transformers(reqs: Sequence[Request], args: argparse.Namespace, fh: Text
     return total
 
 
+OLLAMA_RETRIES = 3  # one rare 500 shouldn't stop a long unattended run
+
+
 def ollama_post(url: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     data = None if payload is None else json.dumps(payload).encode()
     request = urllib.request.Request(url + path, data=data)
-    with urllib.request.urlopen(request, timeout=900) as response:
-        reply: dict[str, Any] = json.load(response)
-    return reply
+    for attempt in range(1, OLLAMA_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=900) as response:
+                reply: dict[str, Any] = json.load(response)
+            return reply
+        except OSError as exc:  # server errors, timeouts, connection drops
+            client_error = isinstance(exc, urllib.error.HTTPError) and exc.code < 500
+            if client_error or attempt == OLLAMA_RETRIES:
+                raise
+            log(f"Ollama error ({exc}); retry {attempt}/{OLLAMA_RETRIES - 1} in 30s")
+            time.sleep(30)
+    raise AssertionError("unreachable")
 
 
 def ollama_checkpoint(url: str, model: str) -> str:

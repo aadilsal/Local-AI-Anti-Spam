@@ -16,6 +16,16 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 5 Nov 2026: Phi run stopped by an Ollama 500 at 1,200 requests
+
+At 15:05 Ollama returned HTTP 500 partway through a reply (253 tokens in, the only 500 in the log, with no error message) and `laas.synth.gen` stopped, as designed. Nothing saved was lost: 1,200 requests and 5,225 messages. Replaying the same request with its own seed twice and with two other seeds gave 200 each time, and its 323-token prompt matches the failed one, so a resume will get past it. The cause is unknown. The installer was running and physical memory was low (1 GB free), but nothing links either to the failure. Failed requests are at 130 of 1,200 (11%), of which 69 are `formal_email`. 524 of 5,225 messages use 555 numbers.
+
+**Fix:** `ollama_post` now tries a request up to three times, 30 seconds apart, on server errors, timeouts and dropped connections, so a long run isn't stopped by one rare error. Client errors such as a missing model still stop it straight away. If every try fails the run stops as before, and a resume retries the request. A run started before this change doesn't get the retry.
+
+### 5 Nov 2026: full Phi run started (early check)
+
+Started 12:53 from the owner's terminal. At 229 requests: 984 messages, 13% of requests failed, about 6.6 s per request, on course to finish around 20:15. Links appear in 34% of ham and 38% of spam, so a link alone should not become a spam signal. A rough check flagged 17 of 448 spam messages (4%) as reading like a buyer, mostly `advance_fee_order`, and some of those are correct. **To check when the dataset is built:** `formal_email` fails far more often than other styles (14 of the 29 failures), and 101 of 984 messages use 555 phone numbers, which could become a label signal if they are uneven between ham and spam.
+
 ### 5 Nov 2026: third sample and go-ahead for full generation (prompt v3)
 
 60 Phi requests at `--max-model-len 4096 --max-tokens 2400`: 266 messages, 7 failed requests (12%), about 6.5 s per request, 100% on GPU. Comment spam, crypto and scam orders now read correctly. `keyword_stuffing` was limited to the `short_note` style, and `[email protected]` and bracketed domains are now filtered. **Known limit:** some very short spam from Phi still reads like a real request (for example "I've spotted errors on my website. Could you assist?"), so expect some label noise in `syn_short_note`. Estimates: Phi 4,000 requests in about 7 hours for about 17,700 messages; Qwen 4,000 requests in about 33 hours for about 20,000 messages. The last prompt tweaks were checked by unit tests, not a further sample.

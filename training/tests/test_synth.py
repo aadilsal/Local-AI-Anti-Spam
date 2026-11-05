@@ -1,7 +1,9 @@
 import argparse
 import io
 import json
+import urllib.error
 from collections import Counter
+from email.message import Message
 from pathlib import Path
 
 import pytest
@@ -178,6 +180,47 @@ def test_ollama_backend_writes_rows_and_lets_server_errors_retry(
     assert rows[0]["checkpoint"] == "m:7b@abcdef012345"
     assert gen.main(argv) == 0  # resumes: nothing left to do
     assert len(out.read_text(encoding="utf-8").splitlines()) == 6
+
+
+def http_error(code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("http://x/api/chat", code, "error", Message(), None)
+
+
+def fake_urlopen(
+    monkeypatch: pytest.MonkeyPatch, outcomes: list[Exception | bytes]
+) -> dict[str, list[int]]:
+    calls: dict[str, list[int]] = {"sleeps": [], "opens": []}
+
+    def urlopen(request: object, timeout: int) -> io.BytesIO:
+        calls["opens"].append(timeout)
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return io.BytesIO(outcome)
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    monkeypatch.setattr("time.sleep", calls["sleeps"].append)
+    return calls
+
+
+def test_ollama_post_retries_a_passing_server_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = fake_urlopen(monkeypatch, [http_error(500), TimeoutError("slow"), b'{"ok": true}'])
+    assert gen.ollama_post("http://x", "/api/chat", {}) == {"ok": True}
+    assert calls["sleeps"] == [30, 30]
+
+
+def test_ollama_post_gives_up_after_the_last_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = fake_urlopen(monkeypatch, [http_error(500) for _ in range(gen.OLLAMA_RETRIES)])
+    with pytest.raises(urllib.error.HTTPError):  # the run stops, and a resume retries the request
+        gen.ollama_post("http://x", "/api/chat", {})
+    assert len(calls["opens"]) == gen.OLLAMA_RETRIES
+
+
+def test_ollama_post_does_not_retry_a_client_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = fake_urlopen(monkeypatch, [http_error(404)])
+    with pytest.raises(urllib.error.HTTPError):
+        gen.ollama_post("http://x", "/api/chat", {})
+    assert calls["sleeps"] == []
 
 
 def test_clean_messages_drops_generator_artefacts() -> None:
