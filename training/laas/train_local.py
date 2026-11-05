@@ -91,6 +91,7 @@ def evaluate(
     t_low: float,
     t_high: float,
     spam_share: float,
+    gate_fpr: float = GATE_FPR,
 ) -> dict[str, Any]:
     kw = keyword_baseline(texts)
     flagged = probs >= t_high
@@ -104,8 +105,8 @@ def evaluate(
             r = wilson(fp_dom[domain], n)
             gates[domain] = {
                 **_rate(r),
-                "pass": r.value <= GATE_FPR,  # point estimate within the gate
-                "proven": r.high <= GATE_FPR,  # whole 95% interval within the gate (R4)
+                "pass": r.value <= gate_fpr,  # point estimate within the gate
+                "proven": r.high <= gate_fpr,  # whole 95% interval within the gate (R4)
             }
     return {
         "name": name,
@@ -159,6 +160,15 @@ def synthetic_share_weights(
     return weights, info
 
 
+def platt_fit(
+    z_val: npt.NDArray[np.float64], y_val: npt.NDArray[np.int_], spam_share: float
+) -> tuple[float, float]:
+    """Platt scaling, with validation reweighted to the target spam share, not its own (R14)."""
+    weights = mix_weights(y_val, spam_share)
+    platt = LogisticRegression(C=1e6).fit(z_val.reshape(-1, 1), y_val, sample_weight=weights)
+    return float(platt.coef_[0][0]), float(platt.intercept_[0])
+
+
 def _fmt(r: dict[str, float]) -> str:
     return f"{r['value']:.2%} [{r['low']:.2%}, {r['high']:.2%}]"
 
@@ -189,6 +199,13 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
         "",
         "> Not the PRD gate: no metric here is measured on real contact-form messages.",
         "",
+        results_md(results, GATE_FPR),
+    ]
+    return "\n".join(lines)
+
+
+def results_md(results: list[dict[str, Any]], gate_fpr: float) -> str:
+    lines = [
         "| Set | Ham | Spam | AUC | FPR at t_high (95% CI) | Recall at t_high (95% CI) "
         "| Oracle recall @0.5% FPR | ECE | Keyword FPR | Keyword recall |",
         "|---|---:|---:|---:|---|---|---:|---:|---:|---:|",
@@ -203,7 +220,7 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
         )
     lines += [
         "",
-        f"## Per-domain gate: FPR at t_high <= {GATE_FPR:.1%} for each ham domain (R14)",
+        f"## Per-domain gate: FPR at t_high <= {gate_fpr:.1%} for each ham domain (R14)",
         "",
         "PASS = point estimate within the gate; PROVEN = whole 95% interval within it.",
         "",
@@ -380,11 +397,8 @@ def main(argv: list[str] | None = None) -> int:
     y = {
         name: np.asarray(t.column("label_id").to_numpy(), dtype=np.int_) for name, t in sets.items()
     }
-    # Reweight validation so calibration assumes the target spam share instead of the val mix (R14).
     val_share = float(y["val"].mean())
-    weights = mix_weights(y["val"], args.calib_spam_share)
-    platt = LogisticRegression(C=1e6).fit(z["val"].reshape(-1, 1), y["val"], sample_weight=weights)
-    a, b = float(platt.coef_[0][0]), float(platt.intercept_[0])
+    a, b = platt_fit(z["val"], y["val"], args.calib_spam_share)
     probs = {name: 1 / (1 + np.exp(-(a * v + b))) for name, v in z.items()}
     t_high = threshold_at_fpr(probs["val"], y["val"], 0.005)
     t_low = min(threshold_at_fpr(probs["val"], y["val"], 0.05), t_high)

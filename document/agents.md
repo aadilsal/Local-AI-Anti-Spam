@@ -46,10 +46,24 @@ python -m laas.train --config configs/local-v1.yaml
 python -m laas.export --run runs/<id>  # writes plugin/model/model.bin + parity/fixtures.json
 python -m laas.eval --run runs/<id>    # runs the gates, writes eval/report.md
 
-# Synthetic data (generation runs on a Kaggle/Colab GPU, never locally)
+# On the owner's PC, F: is a USB hard drive, so the environment and data live on the C: SSD through junctions:
+#   training/.venv -> C:/Users/butta/.venvs/laas-training (plain "uv run" and VS Code just work)
+#   training/data and training/runs are junctions to C:/Users/butta/laas/{data,runs}
+
+# Public data: downloads every source in LICENCES.md, writes data/processed/public_v1.parquet
+python -m laas.data.public
+
+# Synthetic data (generated on the local GPU through Ollama; resumes if stopped)
+ollama pull qwen2.5:7b && ollama pull phi4-mini
+python -m laas.synth.gen --backend ollama --generator qwen2.5-7b --model qwen2.5:7b --n-requests 4000 --max-model-len 2048 --out data/synthetic/qwen2.5-7b.jsonl
+python -m laas.synth.gen --backend ollama --generator phi-4-mini --model phi4-mini --n-requests 4000 --max-model-len 4096 --max-tokens 2400 --out data/synthetic/phi-4-mini.jsonl
 python -m laas.synth.notebook          # rebuild notebooks/generate_synthetic.ipynb after editing spec.py/gen.py
 python -m laas.synth.ingest            # data/synthetic/*.jsonl -> data/processed/synthetic_v1.parquet
-python -m laas.train_local --extra data/processed/synthetic_v1.parquet --holdout youtube_spam
+python -m laas.train_local --data data/processed/public_v1.parquet --extra data/processed/synthetic_v1.parquet --holdout youtube_spam
+
+# Cloud model on the local GPU (M6-M8). Needs the "cloud" extra: PyTorch with CUDA, transformers, ONNX Runtime.
+uv sync --extra cloud
+python -m laas.train_cloud --data data/processed/public_v1.parquet --extra data/processed/synthetic_v1.parquet --holdout youtube_spam
 
 # Cloud (from cloud-api/)
 uv sync && pytest

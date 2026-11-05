@@ -11,6 +11,8 @@ training/data/real/
 DataSet/
 data/
 training/data/
+# ...but not the source package that happens to share the name.
+!training/laas/data/
 training/runs/
 plugin/tests/bench/tmp/
 

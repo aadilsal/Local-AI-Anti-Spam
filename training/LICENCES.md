@@ -5,6 +5,8 @@ Audit of every data source the models may touch, as required by PRD §13 ("Re-ch
 - **Status:** drafted 10 Oct 2026 from `spam_ham_corpus_v1` (its `sources.csv`, README and `upstream_licences/`). **Owner spot-check of each permissive source is still to do**: open each "Original" link and confirm the licence matches.
 - **Rule enforced in code:** only `permissive` rows get `split_policy = train`; everything else is `eval_only` (`laas/data/schema.py`). A production training run raises an error if any other row slips in.
 
+- **Rebuilding (5 Nov 2026):** `python -m laas.data.public` downloads the sources below from their original locations and records a sha256 per file in the manifest. Row counts in the first table are from the original corpus; the rebuild's counts are in `public_v1.manifest.json`. It rebuilds all permissive sources plus `spamassassin` and `enron_spam`.
+
 ## Allowed for production training (`permissive`)
 
 | Source | Rows kept (spam / ham) | Licence | Obligation when we ship | Original | Owner check |
@@ -45,7 +47,7 @@ Non-commercial, research-only, or copyright kept by senders.
 | Source | PRD use | Status |
 |---|---|---|
 | `Deysi/spam-detection-dataset` | Train with caution | Not included (Hugging Face unreachable when the corpus was built). Provenance undocumented (review note R10): if added, tag it so a retrain without it is one flag |
-| Synthetic contact-form set | Main training data | Generator built (`laas/synth/`, Kaggle notebook). Generators, checked on Hugging Face 18 Oct 2026: **Qwen/Qwen2.5-7B-Instruct(-AWQ): Apache-2.0**; **microsoft/Phi-4-mini-instruct: MIT**. Both place no conditions on outputs. `laas.synth.ingest` refuses rows from any generator not listed in `GENERATOR_LICENCES` |
+| Synthetic contact-form set | Main training data | Generator built (`laas/synth/`, Kaggle notebook). Generators, checked on Hugging Face 18 Oct 2026: **Qwen/Qwen2.5-7B-Instruct(-AWQ): Apache-2.0**; **microsoft/Phi-4-mini-instruct: MIT**. Both place no conditions on outputs. `laas.synth.ingest` refuses rows from any generator not listed in `GENERATOR_LICENCES`. Local runs use the 4-bit Ollama builds `qwen2.5:7b` and `phi4-mini`; each row records the tag and weights digest |
 | Hand-labelled real messages | **Test only** | Collecting (beta call). `split_policy = test_only` |
 | Opt-in user corrections | Train from model v3 | After launch, under our consent terms |
 

@@ -23,6 +23,7 @@ Project documents for **Local AI Anti-Spam** (working name). This is a WordPress
 | [design.md](design.md) | UX principles, information architecture, every screen with wireframes, email, copy and voice, accessibility, listing assets | Product owner | A screen or flow changes |
 | [security-analysis.md](security-analysis.md) | Assets, adversaries, trust boundaries, threats S1–S29 with controls, privacy traceability, release checklist, incident response | Tech lead | A new data flow, endpoint or render path |
 | [agents.md](agents.md) | Repo map, commands, 15 hard rules, conventions, test expectations, playbooks | Tech lead | Commands or conventions change |
+| [training-log.md](training-log.md) | Running record of data builds, generation runs and model runs with their results | Tech lead | Every data build, generation run or training run |
 
 ## How the IDs connect
 
@@ -37,10 +38,10 @@ When you change a requirement, search the other documents for its ID.
 
 | Milestone (PRD §14) | State |
 |---|---|
-| Week 0: setup (repo, CI, tooling) | **In progress** |
-| Weeks 1–2: data foundation | Not started |
+| Week 0: setup (repo, CI, tooling) | Done |
+| Weeks 1–2: data foundation | **In progress**: data being rebuilt from scratch, see [training-log.md](training-log.md) |
 | Weeks 3–4: models v1 | Not started |
-| Weeks 3–6: free plugin built and submitted | Not started |
+| Weeks 3–6: free plugin built and submitted | Started: PHP inference with parity tests only |
 | ~Week 9: launch + Pro | Not started |
 
 Decisions still open are listed at the end of [PRD.md](PRD.md#15-risks-and-open-questions) and [design.md](design.md#7-open-design-questions).

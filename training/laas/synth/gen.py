@@ -1,7 +1,13 @@
-"""Run one generator model over the request grid (runs on a GPU: Kaggle or Colab).
+"""Run one generator model over the request grid (needs a GPU: this PC, Kaggle or Colab).
 
     python gen.py --generator qwen2.5-7b --model Qwen/Qwen2.5-7B-Instruct-AWQ --quantization awq \
         --fallback-model Qwen/Qwen2.5-7B-Instruct --fallback-4bit --n-requests 200 --out out.jsonl
+
+On a local PC (vLLM doesn't run on Windows) use a local Ollama server, which keeps a 4-bit model
+inside a 6 GB card:
+
+    python -m laas.synth.gen --backend ollama --generator qwen2.5-7b --model qwen2.5:7b \
+        --n-requests 4000 --out data/synthetic/qwen2.5-7b.jsonl
 
 Rows are appended and flushed after every batch, and requests already in the output are skipped,
 so a session that times out can simply be run again. vLLM is used when it works; otherwise plain
@@ -14,7 +20,9 @@ import argparse
 import json
 import sys
 import time
+import urllib.request
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -156,6 +164,67 @@ def run_transformers(reqs: Sequence[Request], args: argparse.Namespace, fh: Text
     return total
 
 
+def ollama_post(url: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    data = None if payload is None else json.dumps(payload).encode()
+    request = urllib.request.Request(url + path, data=data)
+    with urllib.request.urlopen(request, timeout=900) as response:
+        reply: dict[str, Any] = json.load(response)
+    return reply
+
+
+def ollama_checkpoint(url: str, model: str) -> str:
+    """The tag plus the weights' digest, so a row can be traced to the exact checkpoint."""
+    tag = model if ":" in model else f"{model}:latest"  # how Ollama lists an untagged model
+    for entry in ollama_post(url, "/api/tags")["models"]:
+        if entry["name"] == tag:
+            return f"{tag}@{entry['digest'][:12]}"
+    raise RuntimeError(f"{model} isn't on the Ollama server; run: ollama pull {model}")
+
+
+def run_ollama(reqs: Sequence[Request], args: argparse.Namespace, fh: TextIO) -> int:
+    checkpoint = ollama_checkpoint(args.ollama_url, args.model)
+    log(f"STAGE generating with Ollama: {checkpoint}, {args.parallel} at a time")
+
+    def chat(req: Request) -> str:
+        reply = ollama_post(
+            args.ollama_url,
+            "/api/chat",
+            {
+                "model": args.model,
+                "messages": req.chat(),
+                "stream": False,
+                "keep_alive": "30m",
+                # Forces a JSON array of strings, so far fewer replies are thrown away.
+                "format": {"type": "array", "items": {"type": "string"}},
+                "options": {
+                    "temperature": args.temperature,
+                    "top_p": 0.95,
+                    "num_predict": args.max_tokens,
+                    "num_ctx": args.max_model_len,
+                    "seed": int(req.request_id[:8], 16),
+                },
+            },
+        )
+        content: str = reply["message"]["content"]
+        return content
+
+    total = 0
+    n_batches = -(-len(reqs) // args.batch)
+    with ThreadPoolExecutor(max_workers=args.parallel) as pool:
+        for i, chunk in enumerate(batches(reqs, args.batch)):
+            batch_started = time.time()
+            # A server error raises here instead of being recorded as a failed request, so the
+            # next run retries those requests.
+            for req, reply in zip(chunk, pool.map(chat, chunk), strict=True):
+                total += write(fh, req, reply, args, checkpoint)
+            fh.flush()
+            log(
+                f"PROGRESS batch {i + 1}/{n_batches} ({len(chunk)} requests in "
+                f"{time.time() - batch_started:.0f}s): {total:,} messages so far"
+            )
+    return total
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generator", required=True, help="Short name, e.g. qwen2.5-7b")
@@ -163,7 +232,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quantization", default="", help="e.g. awq (vLLM only)")
     parser.add_argument("--fallback-model", default="", help="Checkpoint for transformers")
     parser.add_argument("--fallback-4bit", action="store_true", help="Load fallback in 4-bit")
-    parser.add_argument("--backend", choices=["auto", "vllm", "transformers"], default="auto")
+    parser.add_argument(
+        "--backend", choices=["auto", "vllm", "transformers", "ollama"], default="auto"
+    )
+    parser.add_argument("--ollama-url", default="http://localhost:11434")
+    parser.add_argument("--parallel", type=int, default=1, help="Ollama: requests at a time")
     parser.add_argument("--n-requests", type=int, default=200)
     parser.add_argument("--seed", type=int, default=20261018)
     parser.add_argument("--out", type=Path, required=True)
@@ -186,6 +259,9 @@ def main(argv: list[str] | None = None) -> int:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("a", encoding="utf-8") as fh:
+        if args.backend == "ollama":
+            log(f"Done with Ollama: {run_ollama(todo, args, fh):,} messages")
+            return 0
         if args.backend in ("auto", "vllm"):
             try:
                 total = run_vllm(todo, args, fh)

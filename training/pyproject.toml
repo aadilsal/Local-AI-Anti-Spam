@@ -13,6 +13,14 @@ dependencies = [
     "scipy>=1.13",
 ]
 
+[project.optional-dependencies]
+cloud = [
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
+    "torch>=2.6",
+    "transformers>=4.46",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.11",
@@ -50,9 +58,18 @@ files = ["laas"]
 
 [[tool.mypy.overrides]]
 # vllm, torch and transformers are only installed on the GPU notebook, not locally.
-module = ["datasketch.*", "sklearn.*", "scipy.*", "pyarrow.*", "vllm.*", "torch.*", "transformers.*"]
+module = ["datasketch.*", "sklearn.*", "scipy.*", "pyarrow.*", "vllm.*", "torch.*", "transformers.*", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+# The GPU trainer (laas.train_cloud) and only that. CI and the local model don't need it.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu126", extra = "cloud" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

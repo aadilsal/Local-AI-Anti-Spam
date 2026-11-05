@@ -6,11 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from laas.synth import notebook
+from laas.synth import gen, notebook
 from laas.synth.gen import write
 from laas.synth.ingest import UnknownGeneratorError, load_synthetic, split_for
 from laas.synth.spec import (
     BUSINESSES,
+    INTENT_BY_KEY,
     INTENTS,
     PROMPT_VERSION,
     STYLE_BY_KEY,
@@ -143,3 +144,47 @@ def test_committed_notebook_matches_the_code() -> None:
 
 def test_businesses_have_descriptions() -> None:
     assert all(name and what for name, what in BUSINESSES)
+
+
+def test_ollama_backend_writes_rows_and_lets_server_errors_retry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fail = {"now": True}
+
+    def fake_post(
+        url: str, path: str, payload: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if path == "/api/tags":
+            return {"models": [{"name": "m:7b", "digest": "abcdef0123456789"}]}
+        assert payload is not None
+        assert payload["format"] == {"type": "array", "items": {"type": "string"}}
+        if fail["now"]:
+            raise OSError("server down")
+        return {"message": {"content": '["first message here", "second message here"]'}}
+
+    monkeypatch.setattr(gen, "ollama_post", fake_post)
+    out = tmp_path / "out.jsonl"
+    argv = ["--generator", "qwen2.5-7b", "--model", "m:7b", "--backend", "ollama"]
+    argv += ["--n-requests", "3", "--out", str(out)]
+
+    with pytest.raises(OSError):  # a dead server must not mark requests as permanently failed
+        gen.main(argv)
+    assert not out.read_text(encoding="utf-8")
+
+    fail["now"] = False
+    assert gen.main(argv) == 0
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 6
+    assert rows[0]["checkpoint"] == "m:7b@abcdef012345"
+    assert gen.main(argv) == 0  # resumes: nothing left to do
+    assert len(out.read_text(encoding="utf-8").splitlines()) == 6
+
+
+def test_clean_messages_drops_generator_artefacts() -> None:
+    assert clean_messages(["Email us at [email protected] for a quote"]) == []
+    assert clean_messages(["do u cover [gardencollections.com] area?"]) == []
+    assert clean_messages(["see www.gardencollections.com for details"]) != []
+
+
+def test_keyword_stuffing_only_uses_a_style_that_allows_junk() -> None:
+    assert INTENT_BY_KEY["keyword_stuffing"].styles == ("short_note",)

@@ -22,7 +22,12 @@ from dataclasses import asdict, dataclass
 # v2 (18 Oct 2026, after the pilot review): genuine writers sometimes include links and emails (v1
 # had none, which would teach "link = spam"); spam briefs say who is selling to whom (v1's loan
 # offers came out as customers asking for loans); stricter artefact filter.
-PROMPT_VERSION = 2
+# v3 (5 Nov 2026, after the first local sample): some spam came out as real enquiries ("can you
+# install EV chargers too?" as comment spam, "quote me for 30 albums" as a scam order), which would
+# teach the model to flag real customers. Those intents now require their tell. Writers in one reply
+# were also near-copies sharing fake numbers like 0412345678, so variety is spelled out. The second
+# sample showed keyword_stuffing written as real enquiries and crypto writers who promoted nothing.
+PROMPT_VERSION = 3
 MESSAGES_PER_REQUEST = 5
 
 # (business, what a customer would contact it about). At least 20 types (PRD D6).
@@ -289,8 +294,9 @@ INTENTS = [
         "spam",
         "phishing",
         "contact_form",
-        "a fraudulent large order: wants to buy in bulk, pay by cheque or with an overpayment, or "
-        "ship abroad through 'their own shipper'",
+        "a fraudulent large order. Every message must include a clear scam tell: paying by cheque "
+        "or with an overpayment, shipping abroad through 'their own shipper', or not caring about "
+        "the price",
         0.4,
         ("formal_email", "non_native", "polite_brief"),
     ),
@@ -299,7 +305,8 @@ INTENTS = [
         "spam",
         "crypto",
         "contact_form",
-        "promotes a crypto, forex or investment scheme with guaranteed returns",
+        "promotes a crypto, forex or investment scheme. Every message must name the scheme and "
+        "promise returns; the writer is recruiting the business owner, not asking for advice",
         0.5,
         ("casual_chat", "short_note", "non_native", "formal_email"),
     ),
@@ -320,7 +327,8 @@ INTENTS = [
         "bot",
         "comment",
         "a short generic comment ('great post, very informative') that exists only to leave a "
-        "link to an unrelated site",
+        "link. Every message must contain a made-up link to a site selling something unrelated to "
+        "the post, and must not ask the business anything real",
         1.0,
         ("short_note", "casual_chat", "non_native", "polite_brief"),
     ),
@@ -329,9 +337,10 @@ INTENTS = [
         "spam",
         "bot",
         "contact_form",
-        "machine-written junk: repeated keywords, lists of links, or text that makes no sense",
+        "machine-written junk, not a real request: repeated keywords, lists of links, or text "
+        "that makes no sense. No normal sentences and no questions about the business",
         0.4,
-        ("short_note", "non_native"),
+        ("short_note",),  # non_native asks for "clear meaning", which turned it into real enquiries
     ),
 ]
 INTENT_BY_KEY = {i.key: i for i in INTENTS}
@@ -376,6 +385,8 @@ def user_prompt(
     if intent.label == "spam":
         who = f"a spammer or scammer writing TO the {business[0]} (not one of its customers)"
         extras = (
+            "A site owner reading closely must be able to tell the writer is not a real customer, "
+            "and even a very short message must say plainly what is being sold or pushed. "
             "Some messages include a link, an email address or a phone number; others ask for a "
             "reply instead."
         )
@@ -401,8 +412,11 @@ def user_prompt(
         f"Length: about {low}-{high} words each.\n"
         f"Locale: {locale[0]}: {locale[1]}.\n\n"
         f"Write {MESSAGES_PER_REQUEST} different messages, each from a different writer with "
-        "different details. Make them varied and believable; a careful human must not be able to "
-        "tell they are generated. Invent names. Use made-up company names; any website or email "
+        "different details: vary the opening words, the situation and the sentence structure. Make "
+        "them believable; a careful human must not be able to tell they are generated. Invent "
+        "names, and never reuse a name, company or phone number between messages. Phone numbers "
+        "must look real, not 555 numbers or runs like 12345678. Use made-up company names; any "
+        "website or email "
         "must use a made-up domain (never a real brand). Do not use placeholders like [Name].\n\n"
         'Reply with a JSON array of strings only, like ["first message", "second message"].'
     )
@@ -453,13 +467,16 @@ _REFUSALS = (
     "[your name]",
     "lorem ipsum",
     "language model",
+    "[email protected]",  # how some scraped web text shows an email; Phi copies it
 )
 # The model's own scaffolding at the start of a message ("1.", "Message 2:", "Subject:"); a numbered
 # list inside a genuine email is fine, so only the start is checked.
 _LEADING_LABEL = re.compile(
     r"^\s*((message|email|comment|msg)\s*#?\d+\s*[:.)-]|\d+[.)]\s|subject\s*:)", re.I
 )
-_PLACEHOLDER = re.compile(r"\[[A-Z][A-Za-z ]{1,25}\]|\{\{?[A-Za-z_ ]{2,25}\}?\}")
+_PLACEHOLDER = re.compile(
+    r"\[[A-Z][A-Za-z ]{1,25}\]|\{\{?[A-Za-z_ ]{2,25}\}?\}|\[[a-z0-9.-]+\.[a-z]{2,}\]"
+)
 
 
 def parse_response(text: str) -> list[str]:
