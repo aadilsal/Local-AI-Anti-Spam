@@ -54,6 +54,22 @@ def batches(items: Sequence[Request], size: int) -> Iterator[Sequence[Request]]:
         yield items[start : start + size]
 
 
+def complete_lines(path: Path) -> bytes:
+    """The file up to its last newline: a power cut can leave a half-written line after it."""
+    data = path.read_bytes()
+    return data[: data.rfind(b"\n") + 1]
+
+
+def drop_partial_line(path: Path) -> None:
+    if not path.exists():
+        return
+    keep = len(complete_lines(path))
+    if keep < path.stat().st_size:
+        log(f"Dropping a half-written last line from {path.name}")
+        with path.open("r+b") as fh:
+            fh.truncate(keep)
+
+
 def done_ids(path: Path) -> set[str]:
     if not path.exists():
         return set()
@@ -215,6 +231,7 @@ def run_ollama(reqs: Sequence[Request], args: argparse.Namespace, fh: TextIO) ->
                     "num_predict": args.max_tokens,
                     "num_ctx": args.max_model_len,
                     "seed": int(req.request_id[:8], 16),
+                    **({} if args.num_gpu is None else {"num_gpu": args.num_gpu}),
                 },
             },
         )
@@ -250,6 +267,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--ollama-url", default="http://localhost:11434")
     parser.add_argument("--parallel", type=int, default=1, help="Ollama: requests at a time")
+    parser.add_argument(
+        "--num-gpu",
+        type=int,
+        default=None,
+        help="Ollama: model layers on the GPU; 99 = all, when its estimate leaves some on the CPU",
+    )
     parser.add_argument("--n-requests", type=int, default=200)
     parser.add_argument("--seed", type=int, default=20261018)
     parser.add_argument("--out", type=Path, required=True)
@@ -262,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     reqs = build_requests(args.n_requests, args.seed, args.generator)
+    drop_partial_line(args.out)
     done = done_ids(args.out)
     todo = [r for r in reqs if r.request_id not in done]
     log(

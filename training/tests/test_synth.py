@@ -182,6 +182,40 @@ def test_ollama_backend_writes_rows_and_lets_server_errors_retry(
     assert len(out.read_text(encoding="utf-8").splitlines()) == 6
 
 
+def test_power_cut_leaves_a_partial_line_that_resume_and_ingest_survive(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def fake_post(
+        url: str, path: str, payload: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if path == "/api/tags":
+            return {"models": [{"name": "m:7b", "digest": "abcdef0123456789"}]}
+        assert payload is not None
+        options = payload["options"]
+        assert isinstance(options, dict)
+        assert options["num_gpu"] == 99
+        return {"message": {"content": '["first message here", "second message here"]'}}
+
+    monkeypatch.setattr(gen, "ollama_post", fake_post)
+    out = tmp_path / "out.jsonl"
+    argv = ["--generator", "qwen2.5-7b", "--model", "m:7b", "--backend", "ollama"]
+    argv += ["--n-requests", "3", "--num-gpu", "99", "--out", str(out)]
+    assert gen.main(argv) == 0
+
+    # Keep four whole rows, then half a row cut inside a two-byte character.
+    lines = out.read_bytes().splitlines(keepends=True)
+    out.write_bytes(b"".join(lines[:4]) + lines[4][:40] + "é".encode()[:1])
+    size = out.stat().st_size
+
+    assert load_synthetic([out]).num_rows > 0  # reading doesn't crash on the partial line
+    assert out.stat().st_size == size  # and doesn't change the file
+
+    assert gen.main(argv) == 0  # the request in the partial line is generated again
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 6
+    assert len({r["request_id"] for r in rows}) == 3
+
+
 def http_error(code: int) -> urllib.error.HTTPError:
     return urllib.error.HTTPError("http://x/api/chat", code, "error", Message(), None)
 

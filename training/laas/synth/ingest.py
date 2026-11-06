@@ -24,6 +24,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from laas.data.schema import SCHEMA, SplitPolicy
+from laas.synth.gen import complete_lines
 from laas.synth.spec import clean_messages
 
 TRAINING_DIR = Path(__file__).resolve().parents[2]
@@ -51,44 +52,44 @@ def load_synthetic(paths: list[Path]) -> pa.Table:
     rows: dict[str, list[object]] = {name: [] for name in SCHEMA.names}
     seen: set[str] = set()
     for path in paths:
-        with path.open(encoding="utf-8") as fh:
-            for line in fh:
-                if not line.strip():
-                    continue
-                r = json.loads(line)
-                if r.get("failed"):
-                    continue
-                licence = GENERATOR_LICENCES.get(r["generator"])
-                if licence is None:
-                    raise UnknownGeneratorError(
-                        f"{path.name}: generator {r['generator']!r} has no recorded licence"
-                    )
-                text = r["text"].strip()
-                key = " ".join(text.lower().split())
-                if key in seen:  # exact duplicates across generators and requests
-                    continue
-                if not clean_messages([text]):  # same filter as generation, for older outputs too
-                    continue
-                seen.add(key)
-                values = {
-                    "id": hashlib.sha256(text.encode()).hexdigest()[:16],
-                    "text": text,
-                    "subject": "",
-                    "label": r["label"],
-                    "label_id": 1 if r["label"] == "spam" else 0,
-                    "subtype": r["subtype"],
-                    "domain": "syn_comment" if r["channel"] == "comment" else f"syn_{r['style']}",
-                    "language": "en",
-                    "source": f"synthetic_{r['generator']}",
-                    "licence": licence,
-                    "licence_tier": "permissive",
-                    "split_policy": SplitPolicy.TRAIN.value,
-                    "template_id": r["template_id"],
-                    "corpus_split": split_for(r["template_id"]),
-                    "has_url": bool(URL.search(text)),
-                }
-                for name in SCHEMA.names:
-                    rows[name].append(values[name])
+        # Read-only: the file may belong to a stopped run, or one still writing.
+        for line in complete_lines(path).decode("utf-8").split("\n"):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r.get("failed"):
+                continue
+            licence = GENERATOR_LICENCES.get(r["generator"])
+            if licence is None:
+                raise UnknownGeneratorError(
+                    f"{path.name}: generator {r['generator']!r} has no recorded licence"
+                )
+            text = r["text"].strip()
+            key = " ".join(text.lower().split())
+            if key in seen:  # exact duplicates across generators and requests
+                continue
+            if not clean_messages([text]):  # same filter as generation, for older outputs too
+                continue
+            seen.add(key)
+            values = {
+                "id": hashlib.sha256(text.encode()).hexdigest()[:16],
+                "text": text,
+                "subject": "",
+                "label": r["label"],
+                "label_id": 1 if r["label"] == "spam" else 0,
+                "subtype": r["subtype"],
+                "domain": "syn_comment" if r["channel"] == "comment" else f"syn_{r['style']}",
+                "language": "en",
+                "source": f"synthetic_{r['generator']}",
+                "licence": licence,
+                "licence_tier": "permissive",
+                "split_policy": SplitPolicy.TRAIN.value,
+                "template_id": r["template_id"],
+                "corpus_split": split_for(r["template_id"]),
+                "has_url": bool(URL.search(text)),
+            }
+            for name in SCHEMA.names:
+                rows[name].append(values[name])
     return pa.table(rows, schema=SCHEMA)
 
 

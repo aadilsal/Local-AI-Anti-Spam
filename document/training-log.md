@@ -2,19 +2,33 @@
 
 A running record of data builds, generation runs and model runs: what was run, on what data, and what came out. Newest first. Full reports live in `training/runs/<id>/report.md`, which is gitignored, so the numbers that matter are copied here.
 
-## Current state (5 Nov 2026)
+## Current state (6 Nov 2026)
 
 | Item | State |
 |---|---|
 | Where it runs | The owner's PC only: RTX 2060 6 GB, Ryzen 5 2600X, 16 GB RAM. No Kaggle or Colab |
 | Public data | Built: 291,425 rows (257,955 trainable, of which 2,077 spam; 33,470 evaluation-only) |
-| Synthetic data | Prompt v3 reviewed on samples; full run started by the owner from their terminal |
+| Synthetic data | Phi complete: 4,000 requests, 17,353 messages. Qwen not yet run |
 | Local model | Not yet trained on this PC |
 | Cloud model (M6–M8) | `laas/train_cloud.py` written, not yet run |
 | Real test set | 0 of 500 messages. Depends on beta sites, so no PRD §9.4 gate can be measured yet |
 | Known gaps | `python -m laas.label`, named in labelling-guidelines.md, does not exist yet. `laas.train`, `laas.export` and `laas.eval --run`, named in agents.md, do not exist yet either |
 
 ## Log
+
+### 6 Nov 2026: Qwen sped up about 4x by keeping it all on the GPU
+
+Ollama's memory estimate left 16% of Qwen on the CPU even at `--max-model-len 2048`. The new `--num-gpu 99` option puts every layer on the GPU, where it fits: 5.3 of 6.1 GB, with Windows and open apps included. Speed went from about 19 to about 56 tokens per second. A 64-request sample through `laas.synth.gen` took 508 s (7.9 s per request, about 30 s before) and gave 308 messages (160 spam, 148 ham) with 1 failed request and no server errors, at 68 °C. For 4,000 requests that means about 9 hours and about 19,000 messages. The sample is not used in the dataset. **Limit:** only about 800 MB of GPU memory is spare, so a game or other GPU-heavy app could cause errors during a run.
+
+**Label noise found in that sample:** half of `fake_enquiry_pitch` (5 of 10, all `casual_chat`) reads as a real customer with a brief mention of a product, and most of `loan_offer` (at least 8 of 10) has the writer asking for a loan or a booking instead of offering one. The two intents are about 12% of the sample's spam. Rows record their `intent` and `style`, so they can be dropped at ingest if the prompts aren't changed.
+
+### 6 Nov 2026: Phi run complete
+
+Finished at 11:13 after being stopped and resumed. All 4,000 requests are present, with no broken lines, no duplicates, one checkpoint (`phi4-mini:latest@78fad5d182a7`) and prompt v3 throughout. 17,353 messages: 9,279 ham and 8,074 spam. 462 requests failed (11.6%) and are not retried; `formal_email` lost 34% of its requests (241 of 708) against 3–10% for other styles, leaving 2,192 messages in that style. A check of the requests that fail is still open.
+
+Possible label signals, none acted on yet. **Fine:** 555 numbers (ham 9.1%, spam 9.7%) and links (ham 32.0%, spam 33.5%) are even. **To measure at training:** `example.` domains (ham 5.4%, spam 1.2%) and email addresses (ham 31.7%, spam 19.6%) lean towards ham, and spam is shorter (median 26 words against 36). PyTorch sees the RTX 2060 (CUDA 12.6) and ran a test calculation on it, now that the installer has finished.
+
+**Power cuts:** `laas.synth.gen` now removes a half-written last line before it resumes, so a sudden cut no longer crashes the resume. `laas.synth.ingest` skips such a line without changing the file. Rows already saved for a request cut partway through stay, so that request may keep fewer messages. A request with no complete row is generated again.
 
 ### 5 Nov 2026: Phi run stopped by an Ollama 500 at 1,200 requests
 
