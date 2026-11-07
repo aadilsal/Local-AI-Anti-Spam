@@ -27,8 +27,14 @@ from dataclasses import asdict, dataclass
 # teach the model to flag real customers. Those intents now require their tell. Writers in one reply
 # were also near-copies sharing fake numbers like 0412345678, so variety is spelled out. The second
 # sample showed keyword_stuffing written as real enquiries and crypto writers who promoted nothing.
-PROMPT_VERSION = 3
+# v4 (6 Nov 2026, after the Qwen sample): half of fake_enquiry_pitch was a real customer mentioning
+# a product, and loan_offer writers asked for loans or booked rooms. Both now say what must be sold.
+# v5 (7 Nov 2026, after the first model runs): 27% of genuine comments carried links and many read
+# as promotion, so comments now carry none and no ham sells anything. Phishing and scam orders came
+# out in a customer's voice, so both say who the writer pretends to be. Adds the focus grid below.
+PROMPT_VERSION = 5
 MESSAGES_PER_REQUEST = 5
+LONG_MESSAGES_PER_REQUEST = 2  # long styles: five would not fit the reply limit
 
 # (business, what a customer would contact it about). At least 20 types (PRD D6).
 BUSINESSES = [
@@ -123,6 +129,12 @@ STYLES = [
         0.6,
     ),
     Style("polite_brief", "polite and to the point, three or four sentences", (25, 70), 1.0),
+    Style(
+        "long_email",
+        "a long, carefully written email with several paragraphs of specific detail",
+        (180, 320),
+        0.4,
+    ),
 ]
 STYLE_BY_KEY = {s.key: s for s in STYLES}
 
@@ -202,6 +214,27 @@ INTENTS = [
         ("short_note", "casual_chat", "polite_brief", "typo_heavy", "non_native"),
     ),
     Intent(
+        "found_online_enquiry",
+        "ham",
+        "enquiry",
+        "contact_form",
+        "a real customer who found the website online and wants to buy or book something from "
+        "the business. They name what they need and ask to be called or emailed, often leaving a "
+        "phone number",
+        0.5,
+        ("short_note", "casual_chat", "polite_brief", "typo_heavy", "non_native", "formal_email"),
+    ),
+    Intent(
+        "detailed_enquiry",
+        "ham",
+        "enquiry",
+        "contact_form",
+        "a real customer explaining their job or situation in full: the background, what they "
+        "have already tried, dates, budget and several specific questions",
+        0.3,
+        ("long_email", "rambling"),
+    ),
+    Intent(
         "job_application",
         "ham",
         "other_ham",
@@ -273,8 +306,10 @@ INTENTS = [
         "spam",
         "solicitation",
         "contact_form",
-        "pretends to be a customer enquiry in the first line, then turns into a sales pitch for a "
-        "marketing or software service",
+        "opens with one line that sounds like a customer enquiry, then drops it: the rest is a "
+        "sales pitch from the writer's own named company, selling its marketing or software "
+        "service to the business, with a benefit or price and how to buy. The writer has no real "
+        "need of the business and never asks about its products",
         0.7,
         _SPAMMY_STYLES,
     ),
@@ -284,8 +319,10 @@ INTENTS = [
         "spam",
         "phishing",
         "contact_form",
-        "a scam: the domain or website is about to expire, an invoice or legal/copyright notice "
-        "is attached, or the account needs verifying via a link",
+        "a scam from someone pretending to be a domain registrar, web host, lawyer or billing "
+        "department. It warns that the business's own domain is about to expire, demands payment "
+        "of an attached invoice, makes a legal or copyright threat, or says its account must be "
+        "verified through a link. The writer is never a customer with a problem of their own",
         0.8,
         ("formal_email", "short_note", "polite_brief", "non_native"),
     ),
@@ -294,9 +331,10 @@ INTENTS = [
         "spam",
         "phishing",
         "contact_form",
-        "a fraudulent large order. Every message must include a clear scam tell: paying by cheque "
-        "or with an overpayment, shipping abroad through 'their own shipper', or not caring about "
-        "the price",
+        "a fraudulent large order. Every message must state a clear scam tell in the writer's own "
+        "words: they will pay by cheque or overpay and want the difference sent back, they will "
+        "ship abroad through their own shipper, or they do not care what it costs. An order "
+        "without one of these is not acceptable",
         0.4,
         ("formal_email", "non_native", "polite_brief"),
     ),
@@ -315,9 +353,10 @@ INTENTS = [
         "spam",
         "bot",
         "contact_form",
-        "a lender or broker cold-pitching business loans, funding or merchant cash advances with "
-        "'instant approval' to the business owner (the writer is offering money, not asking "
-        "for it)",
+        "a lender or broker from a named finance company, cold-pitching business loans, funding or "
+        "merchant cash advances with 'instant approval' to the business owner. Every message "
+        "offers money and states an amount or terms. The writer never asks for money, a quote or "
+        "a booking",
         0.4,
         _SPAMMY_STYLES,
     ),
@@ -333,6 +372,17 @@ INTENTS = [
         ("short_note", "casual_chat", "non_native", "polite_brief"),
     ),
     Intent(
+        "self_promo_comment",
+        "spam",
+        "bot",
+        "comment",
+        "someone using the comments to promote themselves, unrelated to the post: 'subscribe to "
+        "my channel', 'check out my music', 'follow me', a giveaway or their small shop. Most "
+        "give only a channel or account name and no link, and they ask nothing about the post",
+        0.4,
+        ("short_note", "casual_chat", "typo_heavy", "non_native", "polite_brief"),
+    ),
+    Intent(
         "keyword_stuffing",
         "spam",
         "bot",
@@ -344,6 +394,27 @@ INTENTS = [
     ),
 ]
 INTENT_BY_KEY = {i.key: i for i in INTENTS}
+
+# Targeted top-up (``--focus``), from the error analysis of 7 Nov 2026: (intent, styles, weight).
+# Ham where the models raised false alarms, long ham, and spam in styles that only ham had.
+_LOOSE_SPAM_STYLES = ("typo_heavy", "angry", "rambling")
+FOCUS_GRID: tuple[tuple[str, tuple[str, ...], float], ...] = (
+    ("genuine_comment", INTENT_BY_KEY["genuine_comment"].styles, 3.0),
+    ("vague_callback", INTENT_BY_KEY["vague_callback"].styles, 2.5),
+    ("found_online_enquiry", INTENT_BY_KEY["found_online_enquiry"].styles, 2.5),
+    ("detailed_enquiry", INTENT_BY_KEY["detailed_enquiry"].styles, 1.5),
+    ("customer_problem", ("short_note", "casual_chat"), 1.0),
+    ("thanks_feedback", ("short_note", "casual_chat"), 0.5),
+    ("quote_request", ("short_note", "typo_heavy"), 0.5),
+    ("self_promo_comment", INTENT_BY_KEY["self_promo_comment"].styles, 2.5),
+    ("phishing", INTENT_BY_KEY["phishing"].styles, 1.5),
+    ("advance_fee_order", INTENT_BY_KEY["advance_fee_order"].styles, 1.5),
+    ("seo_pitch", _LOOSE_SPAM_STYLES, 1.5),
+    ("web_design_pitch", _LOOSE_SPAM_STYLES, 1.5),
+    ("lead_gen_pitch", _LOOSE_SPAM_STYLES, 1.0),
+    ("fake_enquiry_pitch", ("typo_heavy", "rambling"), 1.0),
+    ("crypto_investment", ("typo_heavy", "rambling"), 0.5),
+)
 
 SYSTEM_PROMPT = (
     "You write realistic example messages for testing a spam filter for small-business websites. "
@@ -392,17 +463,26 @@ def user_prompt(
         )
     else:
         who = f"a real customer or reader of the {business[0]}"
-        # Without this, genuine messages never contain links and the model learns "link = spam".
-        extras = (
-            "About one in four writers mentions a link (their own website, a photo album, a "
-            "listing or the product page they mean) or adds their email address; the rest don't."
-        )
+        if intent.channel == "comment":
+            extras = (
+                "Writers share only an opinion, an experience or a question. They include no "
+                "links, phone numbers or email addresses, and never recommend or promote a "
+                "company, website or product."
+            )
+        else:
+            # Without this, genuine messages never contain links and the model learns "link = spam".
+            extras = (
+                "About one in four writers mentions a link (their own website, a photo album, a "
+                "listing or the product page they mean) or adds their email address; the rest "
+                "don't. The writer wants something from this business and sells nothing to it."
+            )
     where = (
         "the contact form on the website"
         if intent.channel == "contact_form"
         else "the comments under a blog post on the website"
     )
     low, high = style.words
+    count = LONG_MESSAGES_PER_REQUEST if low >= 150 else MESSAGES_PER_REQUEST
     return (
         f"Business: a {business[0]} ({business[1]}).\n"
         f"Where the message is posted: {where}.\n"
@@ -411,7 +491,7 @@ def user_prompt(
         f"Writing style: {style.description}.\n"
         f"Length: about {low}-{high} words each.\n"
         f"Locale: {locale[0]}: {locale[1]}.\n\n"
-        f"Write {MESSAGES_PER_REQUEST} different messages, each from a different writer with "
+        f"Write {count} different messages, each from a different writer with "
         "different details: vary the opening words, the situation and the sentence structure. Make "
         "them believable; a careful human must not be able to tell they are generated. Invent "
         "names, and never reuse a name, company or phone number between messages. Phone numbers "
@@ -422,18 +502,23 @@ def user_prompt(
     )
 
 
-def build_requests(n: int, seed: int, generator: str) -> list[Request]:
-    """Sample ``n`` generation requests. Deterministic for a given (seed, generator)."""
-    rng = random.Random(f"{seed}:{generator}:{PROMPT_VERSION}")
-    intent_weights = [i.weight for i in INTENTS]
+def build_requests(n: int, seed: int, generator: str, focus: bool = False) -> list[Request]:
+    """Sample ``n`` generation requests. Deterministic for a given (seed, generator, focus)."""
+    tag = "focus:" if focus else ""
+    rng = random.Random(f"{seed}:{generator}:{tag}{PROMPT_VERSION}")
+    grid = (
+        [(INTENT_BY_KEY[key], styles, weight) for key, styles, weight in FOCUS_GRID]
+        if focus
+        else [(i, i.styles, i.weight) for i in INTENTS]
+    )
     out: list[Request] = []
     for k in range(n):
-        intent = rng.choices(INTENTS, weights=intent_weights)[0]
-        styles = [STYLE_BY_KEY[key] for key in intent.styles]
+        intent, style_keys, _ = rng.choices(grid, weights=[entry[2] for entry in grid])[0]
+        styles = [STYLE_BY_KEY[key] for key in style_keys]
         style = rng.choices(styles, weights=[s.weight for s in styles])[0]
         business = rng.choice(BUSINESSES)
         locale = rng.choice(LOCALES)
-        rid = hashlib.sha256(f"{generator}:{seed}:{k}".encode()).hexdigest()[:16]
+        rid = hashlib.sha256(f"{generator}:{seed}:{tag}{k}".encode()).hexdigest()[:16]
         out.append(
             Request(
                 request_id=rid,
@@ -475,8 +560,12 @@ _LEADING_LABEL = re.compile(
     r"^\s*((message|email|comment|msg)\s*#?\d+\s*[:.)-]|\d+[.)]\s|subject\s*:)", re.I
 )
 _PLACEHOLDER = re.compile(
-    r"\[[A-Z][A-Za-z ]{1,25}\]|\{\{?[A-Za-z_ ]{2,25}\}?\}|\[[a-z0-9.-]+\.[a-z]{2,}\]"
+    r"\[[A-Z][A-Za-z '\u2019]{1,25}\]|\{\{?[A-Za-z_ ]{2,25}\}?\}|\[[a-z0-9.-]+\.[a-z]{2,}\]"
 )
+
+
+# Output that isn't a message: Qwen drifting into Chinese mid-sentence, or a dict leaking from Phi.
+_STRAY_OUTPUT = re.compile(r"[぀-ヿ一-鿿]|\{'")
 
 
 def parse_response(text: str) -> list[str]:
@@ -508,7 +597,7 @@ def clean_messages(texts: list[str]) -> list[str]:
         key = " ".join(text.lower().split())
         if len(key) < 3 or key in seen or any(marker in key for marker in _REFUSALS):
             continue
-        if _LEADING_LABEL.match(text) or _PLACEHOLDER.search(text):
+        if _LEADING_LABEL.match(text) or _PLACEHOLDER.search(text) or _STRAY_OUTPUT.search(text):
             continue
         seen.add(key)
         out.append(text)

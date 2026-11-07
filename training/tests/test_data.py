@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
-import pyarrow.compute as pc
+import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 import pytest
 
@@ -13,6 +14,8 @@ from laas.data.schema import (
     assert_trainable,
     policy_for_tier,
 )
+
+pc: Any = arrow_compute  # pyarrow creates these functions at import; type checkers can't see them
 
 
 def _rows(split: str, tiers: list[str]) -> pa.Table:

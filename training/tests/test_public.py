@@ -2,16 +2,22 @@ import io
 import tarfile
 import zipfile
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from laas.data.public import (
     SOURCE_BY_NAME,
     Row,
     build_table,
     email_body,
+    parse_deysi,
     parse_spamassassin,
     parse_uci_sms,
+    parse_youtube,
+    parse_youtube_train,
     split_for,
 )
-from laas.data.schema import SplitPolicy
+from laas.data.schema import SplitPolicy, policy_for_tier
 
 SMS = SOURCE_BY_NAME["uci_sms"]
 ENRON = SOURCE_BY_NAME["enron_spam"]
@@ -61,6 +67,27 @@ def test_parse_uci_sms() -> None:
         ("ham", "hello there"),
         ("spam", "free prize"),
     ]
+
+
+def test_youtube_videos_stay_on_their_own_side() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name in ("Youtube01-Psy", "Youtube02-KatyPerry", "Youtube03-LMFAO"):
+            archive.writestr(f"{name}.csv", f"CONTENT,CLASS\n{name} train,1\n")
+        for name in ("Youtube04-Eminem", "Youtube05-Shakira"):
+            archive.writestr(f"{name}.csv", f"CONTENT,CLASS\n{name} held,0\n")
+    train = list(parse_youtube_train([buffer.getvalue()]))
+    held = list(parse_youtube([buffer.getvalue()]))
+    assert len(train) == 3 and all(r.label == "spam" and "train" in r.text for r in train)
+    assert len(held) == 2 and all(r.label == "ham" and "held" in r.text for r in held)
+
+
+def test_deysi_is_evaluation_only_and_its_labels_map() -> None:
+    assert policy_for_tier(SOURCE_BY_NAME["deysi_spam"].tier) == SplitPolicy.EVAL_ONLY
+    buffer = io.BytesIO()
+    pq.write_table(pa.table({"text": ["buy", "hello"], "label": ["spam", "not_spam"]}), buffer)
+    rows = list(parse_deysi([buffer.getvalue()]))
+    assert [(r.text, r.label) for r in rows] == [("buy", "spam"), ("hello", "ham")]
 
 
 def test_email_body_handles_plain_and_html() -> None:

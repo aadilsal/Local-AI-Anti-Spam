@@ -67,7 +67,7 @@ if os.path.isdir("/kaggle/working"):
     OUT_DIR = "/kaggle/working/synthetic"
 else:
     try:  # Colab wipes its disk on disconnect; Google Drive keeps the output so runs can resume.
-        from google.colab import drive
+        from google.colab import drive  # pyright: ignore[reportMissingImports]
         print("   Colab: connecting Google Drive so progress survives disconnects (approve the popup)")
         drive.mount("/content/drive")
         OUT_DIR = "/content/drive/MyDrive/laas-synthetic"
@@ -75,7 +75,7 @@ else:
         OUT_DIR = os.path.abspath("synthetic")
 os.makedirs(OUT_DIR, exist_ok=True)
 print(f"   mode: {'PILOT' if PILOT else 'FULL RUN'} · {N_REQUESTS} requests x 5 messages per model")
-print(f"   models: {', '.join(g['generator'] for g in GENERATORS)}")
+print(f"   models: {', '.join(str(g['generator']) for g in GENERATORS)}")
 print(f"   engine: {'vLLM (isolated) with transformers fallback' if USE_VLLM else 'transformers'}")
 print(f"   output folder: {OUT_DIR}")
 print("✅ Step 1 done")
@@ -149,7 +149,7 @@ print("✅ Step 2 done")
 """
 
 WRITTEN = """print("▶ Step 3/5: checking the generation code")
-import importlib, spec, gen
+import importlib, spec, gen  # pyright: ignore[reportMissingImports]
 importlib.reload(spec); importlib.reload(gen)
 print(f"   {len(spec.INTENTS)} intents · {len(spec.STYLES)} writing styles · "
       f"{len(spec.BUSINESSES)} business types · {len(spec.LOCALES)} locales")
@@ -276,11 +276,11 @@ print(f"\\n   packaged: {archive} ({size_mb:.1f} MB)")
 # Download: automatic on Colab; a clickable link on Kaggle (Kaggle doesn't allow notebooks to start
 # downloads, and a background "Save & Run All" run has no browser, so use the Output tab there).
 try:
-    from google.colab import files
+    from google.colab import files  # pyright: ignore[reportMissingImports]
     print("   starting the download in your browser (Colab)...")
     files.download(archive)
 except ImportError:
-    from IPython.display import FileLink, display
+    from IPython.display import FileLink, display  # pyright: ignore[reportMissingImports,reportMissingModuleSource]
     print("   click to download (interactive Kaggle session), or use the Output tab:")
     display(FileLink(os.path.relpath(archive), result_html_prefix="   ⬇ "))
 print("✅ Step 5 done: unzip synthetic.zip into training/data/synthetic/ in the repo")

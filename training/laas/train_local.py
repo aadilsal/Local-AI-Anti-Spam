@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pyarrow as pa
-import pyarrow.compute as pc
+import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 import scipy.sparse as sp
 from sklearn.linear_model import LogisticRegression
@@ -43,6 +43,7 @@ from laas.eval import (
 from laas.featurize import DENSE_NAMES, featurize
 from laas.model_file import write_model
 
+pc: Any = arrow_compute  # pyarrow creates these functions at import; type checkers can't see them
 TRAINING_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = TRAINING_DIR / "data" / "processed" / "corpus_v1.parquet"
 DEFAULT_RUNS = TRAINING_DIR / "runs"
@@ -169,6 +170,55 @@ def platt_fit(
     return float(platt.coef_[0][0]), float(platt.intercept_[0])
 
 
+def is_synthetic(table: Any) -> npt.NDArray[np.bool_]:
+    return np.asarray(
+        pc.starts_with(table.column("source"), "synthetic_").to_numpy(zero_copy_only=False),
+        dtype=np.bool_,
+    )
+
+
+def cap_training_rows(
+    labels: npt.NDArray[np.int_],
+    synthetic: npt.NDArray[np.bool_],
+    max_ham: int,
+    max_spam: int,
+    rng: np.random.Generator,
+) -> npt.NDArray[np.int_]:
+    """Sorted row numbers to train on: all synthetic rows, and public rows up to the caps.
+
+    Sampling everything together kept only 28% of the synthetic ham, the rows closest to real
+    contact-form messages, because the public chat data outnumbers it.
+    """
+    keep = [np.flatnonzero(synthetic)]
+    for cls, cap in ((0, max_ham), (1, max_spam)):
+        idx = np.flatnonzero((labels == cls) & ~synthetic)
+        keep.append(rng.choice(idx, size=min(cap, len(idx)), replace=False))
+    return np.sort(np.concatenate(keep))
+
+
+def gate_thresholds(
+    probs: npt.NDArray[np.float64],
+    labels: npt.NDArray[np.int_],
+    synthetic: npt.NDArray[np.bool_],
+    high_fpr: float,
+) -> tuple[float, float]:
+    """(t_low, t_high) that keep the target FPR on all ham and on contact-form-like ham alone.
+
+    Pooled validation ham is mostly short chat that is easy to pass, so a threshold set on it alone
+    flagged about 3% of the synthetic ham at a 0.3-0.5% target.
+    """
+    hard = (labels == 1) | synthetic
+
+    def threshold(fpr: float) -> float:
+        pooled = threshold_at_fpr(probs, labels, fpr)
+        if not synthetic.any():
+            return pooled
+        return max(pooled, threshold_at_fpr(probs[hard], labels[hard], fpr))
+
+    t_high = threshold(high_fpr)
+    return min(threshold(0.05), t_high), t_high
+
+
 def _fmt(r: dict[str, float]) -> str:
     return f"{r['value']:.2%} [{r['low']:.2%}, {r['high']:.2%}]"
 
@@ -181,8 +231,8 @@ def report_md(meta: dict[str, Any], results: list[dict[str, Any]]) -> str:
         f"{meta['n_train']:,} training rows ({meta['n_train_spam']:,} spam) · "
         f"buckets 2^{meta['bucket_bits']} · C={meta['C']}",
         "",
-        f"Thresholds from validation: t_low={meta['t_low']:.4f} (<= 5% FPR), "
-        f"t_high={meta['t_high']:.4f} (<= 0.5% FPR).",
+        f"Thresholds from validation, on all ham and on synthetic ham alone: "
+        f"t_low={meta['t_low']:.4f} (<= 5% FPR), t_high={meta['t_high']:.4f} (<= 0.5% FPR).",
         "",
         f"Calibration fitted as if {meta['calib_spam_share']:.0%} of messages were spam "
         "(scores mean P(spam) at that mix; thresholds are set on ham scores, so they don't move). "
@@ -319,15 +369,15 @@ def main(argv: list[str] | None = None) -> int:
 
     train = rows("train", production)
     labels = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
-    keep = []
-    for cls, cap in ((0, args.max_train_ham), (1, args.max_train_spam)):
-        idx = np.flatnonzero(labels == cls)
-        keep.append(rng.choice(idx, size=min(cap, len(idx)), replace=False))
-    train = train.take(np.sort(np.concatenate(keep)))
+    train = train.take(
+        cap_training_rows(labels, is_synthetic(train), args.max_train_ham, args.max_train_spam, rng)
+    )
 
+    test_production = rows("test", True)
     sets = {
         "val": rows("val", production),
-        "test (production tier)": rows("test", True),
+        "test (production tier)": test_production,
+        "test (synthetic only)": test_production.filter(is_synthetic(test_production)),
         "test (all tiers)": rows("test", False),
     }
     if args.holdout:
@@ -346,18 +396,15 @@ def main(argv: list[str] | None = None) -> int:
         stds = np.where(stds > 1e-12, stds, 1.0)
         y_train = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
 
-        is_synthetic = np.asarray(
-            pc.starts_with(train.column("source"), "synthetic_").to_numpy(zero_copy_only=False),
-            dtype=np.bool_,
-        )
+        train_synthetic = is_synthetic(train)
         share = 0.5 if args.synthetic_share == "auto" else args.synthetic_share
-        if share == "off" or not is_synthetic.any():
+        if share == "off" or not train_synthetic.any():
             sample_weight = np.ones(len(y_train))
-            _, balance = synthetic_share_weights(y_train, is_synthetic, 0.5)
+            _, balance = synthetic_share_weights(y_train, train_synthetic, 0.5)
             for side in balance.values():
                 side["share_after"] = side["share_before"]
         else:
-            sample_weight, balance = synthetic_share_weights(y_train, is_synthetic, float(share))
+            sample_weight, balance = synthetic_share_weights(y_train, train_synthetic, float(share))
         log(
             "Synthetic share of training weight: "
             + ", ".join(
@@ -365,7 +412,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
-        model = LogisticRegression(
+        # Any: sklearn's type hints don't accept scipy's sparse arrays, though fit does.
+        model: Any = LogisticRegression(
             C=args.C, solver="liblinear", class_weight="balanced", max_iter=500
         )
         model.fit(
@@ -400,8 +448,7 @@ def main(argv: list[str] | None = None) -> int:
     val_share = float(y["val"].mean())
     a, b = platt_fit(z["val"], y["val"], args.calib_spam_share)
     probs = {name: 1 / (1 + np.exp(-(a * v + b))) for name, v in z.items()}
-    t_high = threshold_at_fpr(probs["val"], y["val"], 0.005)
-    t_low = min(threshold_at_fpr(probs["val"], y["val"], 0.05), t_high)
+    t_low, t_high = gate_thresholds(probs["val"], y["val"], is_synthetic(sets["val"]), GATE_FPR)
 
     results = [
         evaluate(

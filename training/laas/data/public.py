@@ -85,12 +85,31 @@ def parse_uci_sms(files: list[bytes]) -> Iterator[Row]:
                 yield Row(text, label)
 
 
-def parse_youtube(files: list[bytes]) -> Iterator[Row]:
+def _parse_youtube_videos(files: list[bytes], videos: tuple[str, ...]) -> Iterator[Row]:
     with zipfile.ZipFile(io.BytesIO(files[0])) as archive:
         for name in archive.namelist():
-            if name.lower().endswith(".csv") and "__MACOSX" not in name:
+            if (
+                name.lower().endswith(".csv")
+                and "__MACOSX" not in name
+                and any(video in name for video in videos)
+            ):
                 for r in csv.DictReader(io.StringIO(_decode(archive.read(name)))):
                     yield Row(r["CONTENT"], "spam" if r["CLASS"] == "1" else "ham")
+
+
+# Whole videos stay on one side, so the holdout tests comments from videos never trained on.
+def parse_youtube_train(files: list[bytes]) -> Iterator[Row]:
+    return _parse_youtube_videos(files, ("Psy", "KatyPerry", "LMFAO"))
+
+
+def parse_youtube(files: list[bytes]) -> Iterator[Row]:
+    return _parse_youtube_videos(files, ("Eminem", "Shakira"))
+
+
+def parse_deysi(files: list[bytes]) -> Iterator[Row]:
+    for raw in files:
+        for r in pq.read_table(io.BytesIO(raw)).to_pylist():
+            yield Row(r["text"], "spam" if r["label"] == "spam" else "ham")
 
 
 def parse_india_sms(files: list[bytes]) -> Iterator[Row]:
@@ -213,6 +232,16 @@ SOURCES = [
         "bot",
         ("https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip",),
         parse_uci_sms,
+    ),
+    Source(
+        "youtube_train",
+        "CC BY 4.0",
+        "permissive",
+        "comment",
+        "other_ham",
+        "bot",
+        ("https://archive.ics.uci.edu/static/public/380/youtube+spam+collection.zip",),
+        parse_youtube_train,
     ),
     Source(
         "youtube_spam",
@@ -354,6 +383,22 @@ SOURCES = [
         "bot",
         ("https://github.com/MWiechmann/enron_spam_data/raw/master/enron_spam_data.zip",),
         parse_enron,
+    ),
+    Source(
+        "deysi_spam",
+        "Apache-2.0 tag on the card; provenance undocumented (R10)",
+        "unclear",  # the ham looks like Reddit posts, which the uploader can't relicense
+        "social",
+        "other_ham",
+        "bot",
+        tuple(
+            f"https://huggingface.co/datasets/Deysi/spam-detection-dataset/resolve/main/data/{name}"
+            for name in (
+                "test-00000-of-00001-fa9b3e8ade89a333.parquet",
+                "train-00000-of-00001-daf190ce720b3dbb.parquet",
+            )
+        ),
+        parse_deysi,
     ),
 ]
 SOURCE_BY_NAME = {s.name: s for s in SOURCES}

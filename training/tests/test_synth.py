@@ -10,9 +10,16 @@ import pytest
 
 from laas.synth import gen, notebook
 from laas.synth.gen import write
-from laas.synth.ingest import UnknownGeneratorError, load_synthetic, split_for
+from laas.synth.ingest import (
+    UnknownGeneratorError,
+    label_problem,
+    load_synthetic,
+    split_for,
+    template_splits,
+)
 from laas.synth.spec import (
     BUSINESSES,
+    FOCUS_GRID,
     INTENT_BY_KEY,
     INTENTS,
     PROMPT_VERSION,
@@ -44,10 +51,31 @@ def test_each_request_uses_a_style_its_intent_allows() -> None:
 
 def test_ham_prompts_ask_for_some_links_and_spam_prompts_say_who_sells() -> None:
     reqs = build_requests(400, seed=4, generator="qwen2.5-7b")
-    ham = next(r for r in reqs if r.label == "ham").messages[1][1]
+    ham = next(r for r in reqs if r.label == "ham" and r.channel == "contact_form").messages[1][1]
+    comment = next(r for r in reqs if r.intent == "genuine_comment").messages[1][1]
     spam = next(r for r in reqs if r.label == "spam").messages[1][1]
     assert "one in four writers mentions a link" in ham  # pilot review: no links in v1 ham
+    assert "include no links" in comment  # first model runs: linked comments read as promotion
     assert "writing TO the" in spam and "not one of its customers" in spam
+
+
+def test_focus_requests_stick_to_their_grid_and_differ_from_the_main_run() -> None:
+    allowed = {(key, style) for key, styles, _ in FOCUS_GRID for style in styles}
+    focus = build_requests(1000, seed=1, generator="qwen2.5-7b", focus=True)
+    assert all((r.intent, r.style) in allowed for r in focus)
+    assert {key for key, _, _ in FOCUS_GRID} == {r.intent for r in focus}
+    assert 0.4 < sum(r.label == "ham" for r in focus) / len(focus) < 0.65
+    assert {r.style for r in focus if r.label == "spam"} >= {"typo_heavy", "angry", "rambling"}
+    main = {r.request_id for r in build_requests(1000, seed=1, generator="qwen2.5-7b")}
+    assert not main & {r.request_id for r in focus}
+
+
+def test_long_styles_ask_for_fewer_messages() -> None:
+    reqs = build_requests(400, seed=5, generator="qwen2.5-7b", focus=True)
+    long_prompt = next(r for r in reqs if r.style == "long_email").messages[1][1]
+    short_prompt = next(r for r in reqs if r.style == "short_note").messages[1][1]
+    assert "Write 2 different messages" in long_prompt
+    assert "Write 5 different messages" in short_prompt
 
 
 def test_generators_get_different_requests() -> None:
@@ -118,8 +146,11 @@ def test_ingest_maps_schema_dedupes_and_skips_failures(tmp_path: Path) -> None:
     assert table.num_rows == 2
     assert set(table.column("split_policy").to_pylist()) == {"train"}
     assert table.column("domain").to_pylist() == ["syn_short_note", "syn_short_note"]
-    expected_split = split_for("p1:contact_form:booking:short_note")
-    assert set(table.column("corpus_split").to_pylist()) == {expected_split}
+    # One style only, so rows split by text.
+    expected = [
+        split_for("p1:contact_form:booking:short_note", t, {}) for t in table["text"].to_pylist()
+    ]
+    assert table.column("corpus_split").to_pylist() == expected
 
 
 def test_ingest_refuses_unknown_generators(tmp_path: Path) -> None:
@@ -127,6 +158,46 @@ def test_ingest_refuses_unknown_generators(tmp_path: Path) -> None:
     path.write_text(_row("some-unlicensed-model", "hello") + "\n", encoding="utf-8")
     with pytest.raises(UnknownGeneratorError):
         load_synthetic([path])
+
+
+@pytest.mark.parametrize(
+    ("intent", "label", "text", "problem"),
+    [
+        ("genuine_comment", "ham", "Great post, more at www.mysite.com", "comment_promotion"),
+        ("genuine_comment", "ham", "Loved this post, thanks for the tips", ""),
+        ("vague_callback", "ham", "We're offering lawn care, call back", "ham_selling"),
+        ("booking", "ham", "Can I book? See www.mysite.com for my venue", ""),
+        ("advance_fee_order", "spam", "Please quote me for 40 lessons", "scam_order_without_tell"),
+        ("advance_fee_order", "spam", "I will overpay by cheque", ""),
+        ("phishing", "spam", "I received your invoice, verify it", "phishing_reads_as_customer"),
+        ("phishing", "spam", "Hello, can we talk about things", "phishing_reads_as_customer"),
+        ("phishing", "spam", "Your domain expires today, renew here", ""),
+        ("seo_pitch", "spam", "I can fix your Google ranking", ""),
+        ("seo_pitch", "spam", "Our website isn't ranking, can you help", "pitch_reads_as_buyer"),
+        ("lead_gen_pitch", "spam", "Looking for a social media manager", "pitch_reads_as_buyer"),
+        ("web_design_pitch", "spam", "Your site is slow, visit our site redo.com", ""),
+        ("vague_callback", "ham", "Visit RoofPros.com for our guttering", "ham_selling"),
+        ("thanks_feedback", "ham", "Thanks! Check out my shop at www.mine.com", "ham_selling"),
+        ("service_question", "ham", "I visited your site www.you.com, hours?", ""),
+    ],
+)
+def test_label_problem(intent: str, label: str, text: str, problem: str) -> None:
+    row = {"intent": intent, "label": label, "template_id": f"p5:contact_form:{intent}:short_note"}
+    assert label_problem(row, text) == problem
+
+
+def test_ingest_leaves_out_fake_enquiry_pitch_from_old_prompts(tmp_path: Path) -> None:
+    path = tmp_path / "out.jsonl"
+    lines = [
+        _row("phi-4-mini", "old prompt pitch", "p3:contact_form:fake_enquiry_pitch:short_note"),
+        _row("qwen2.5-7b", "new prompt pitch", "p4:contact_form:fake_enquiry_pitch:short_note"),
+        _row("phi-4-mini", "old prompt booking", "p3:contact_form:booking:short_note"),
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert load_synthetic([path]).column("text").to_pylist() == [
+        "new prompt pitch",
+        "old prompt booking",
+    ]
 
 
 def test_writer_records_failed_requests_for_resume() -> None:
@@ -257,10 +328,40 @@ def test_ollama_post_does_not_retry_a_client_error(monkeypatch: pytest.MonkeyPat
     assert calls["sleeps"] == []
 
 
+STYLES = ("angry", "casual_chat", "formal_email", "non_native", "polite_brief", "short_note")
+
+
+def test_a_template_keeps_its_split_across_prompt_versions() -> None:
+    templates = {f"p{v}:contact_form:booking:{s}" for v in (3, 5) for s in STYLES}
+    splits = template_splits(templates)
+    for style in STYLES:
+        a = split_for(f"p3:contact_form:booking:{style}", "one text", splits)
+        assert a == split_for(f"p5:contact_form:booking:{style}", "another text", splits)
+
+
+def test_every_intent_with_enough_styles_gives_one_to_test_and_one_to_val() -> None:
+    intents = ("booking", "seo_pitch", "vague_callback")
+    splits = template_splits({f"p5:contact_form:{i}:{s}" for i in intents for s in STYLES})
+    for intent in intents:
+        mine = [v for k, v in splits.items() if f":{intent}:" in k]
+        assert sorted(mine) == ["test", "train", "train", "train", "train", "val"]
+
+
+def test_intents_with_few_styles_split_by_message() -> None:
+    splits = template_splits({"p5:contact_form:phishing:short_note", "p5:contact_form:phishing:x"})
+    assert splits == {}
+    template = "p5:contact_form:phishing:short_note"
+    seen = {split_for(template, f"text {n}", splits) for n in range(200)}
+    assert seen == {"train", "val", "test"}
+
+
 def test_clean_messages_drops_generator_artefacts() -> None:
+    assert clean_messages(["Greetings [Owner\u2019s Name], we have an offer for you today"]) == []
     assert clean_messages(["Email us at [email protected] for a quote"]) == []
     assert clean_messages(["do u cover [gardencollections.com] area?"]) == []
     assert clean_messages(["see www.gardencollections.com for details"]) != []
+    assert clean_messages(["Domain expires soon. Contact us for续写"]) == []
+    assert clean_messages([",{'city': 'Ottawa', 'phone': '613-555-9012'}"]) == []
 
 
 def test_keyword_stuffing_only_uses_a_style_that_allows_junk() -> None:

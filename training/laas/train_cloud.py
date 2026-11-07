@@ -25,7 +25,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pyarrow as pa
-import pyarrow.compute as pc
+import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 from scipy.special import logsumexp
 
@@ -36,12 +36,16 @@ from laas.train_local import (
     DEFAULT_DATA,
     DEFAULT_RUNS,
     TRAINING_DIR,
+    cap_training_rows,
     evaluate,
+    gate_thresholds,
+    is_synthetic,
     platt_fit,
     results_md,
     synthetic_share_weights,
 )
 
+pc: Any = arrow_compute  # pyarrow creates these functions at import; type checkers can't see them
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 GATE_FPR = 0.003  # PRD §9.4, cloud model
 MAX_INT8_RECALL_LOSS = 0.005  # PRD M8
@@ -103,7 +107,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--holdout", action="append", default=[], metavar="SOURCE")
     parser.add_argument("--calib-spam-share", type=float, default=0.5)
     parser.add_argument("--synthetic-share", type=float, default=0.5)
-    parser.add_argument("--quant-eval-rows", type=int, default=4000)
+    # 0 = the whole production-tier test set. A 4,000-row sample held only about 470 spam rows,
+    # so one message moved recall by 0.2 points against the 0.5-point M8 gate.
+    parser.add_argument("--quant-eval-rows", type=int, default=0)
     args = parser.parse_args(argv)
 
     # Heavy imports stay here: the rest of training/ and CI run without the "cloud" extra.
@@ -151,14 +157,16 @@ def main(argv: list[str] | None = None) -> int:
 
     train = rows("train", production)
     all_labels = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
-    keep = []
-    for cls, cap in ((0, args.max_train_ham), (1, args.max_train_spam)):
-        idx = np.flatnonzero(all_labels == cls)
-        keep.append(rng.choice(idx, size=min(cap, len(idx)), replace=False))
-    train = train.take(np.sort(np.concatenate(keep)))
+    train = train.take(
+        cap_training_rows(
+            all_labels, is_synthetic(train), args.max_train_ham, args.max_train_spam, rng
+        )
+    )
+    test_production = rows("test", True)
     sets = {
         "val": rows("val", production),
-        "test (production tier)": rows("test", True),
+        "test (production tier)": test_production,
+        "test (synthetic only)": test_production.filter(is_synthetic(test_production)),
         "test (all tiers)": rows("test", False),
     }
     if args.holdout:
@@ -166,11 +174,7 @@ def main(argv: list[str] | None = None) -> int:
 
     y_train = np.asarray(train.column("label_id").to_numpy(), dtype=np.int_)
     targets = subtype_targets(train.column("subtype").to_pylist(), y_train)
-    is_synthetic = np.asarray(
-        pc.starts_with(train.column("source"), "synthetic_").to_numpy(zero_copy_only=False),
-        dtype=np.bool_,
-    )
-    weights, balance = synthetic_share_weights(y_train, is_synthetic, args.synthetic_share)
+    weights, balance = synthetic_share_weights(y_train, is_synthetic(train), args.synthetic_share)
     # Equal total weight per class: subtypes are for the head, the spam/ham split is what's gated.
     for cls in (0, 1):
         weights[y_train == cls] *= len(y_train) / (2 * max(1, int((y_train == cls).sum())))
@@ -210,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
         name: np.asarray(t.column("label_id").to_numpy(), dtype=np.int_) for name, t in sets.items()
     }
     log("Tokenized")
+    val_synthetic = is_synthetic(sets["val"])
+    # Early stopping judges contact-form-like ham, not the easy chat that dominates validation.
+    val_hard = (y["val"] == 1) | (val_synthetic if val_synthetic.any() else True)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     steps = args.epochs * (len(train_ids) // args.batch + 1)
@@ -243,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             seen += len(batch)
             if step % 200 == 0:
                 log(f"epoch {epoch + 1} step {step}: loss {running / seen:.4f}")
-        score = recall_at_gate(predict(set_ids["val"]), y["val"])
+        score = recall_at_gate(predict(set_ids["val"])[val_hard], y["val"][val_hard])
         history.append({"epoch": epoch + 1, "loss": running / seen, "val_recall_at_gate": score})
         log(f"epoch {epoch + 1}: val recall at {GATE_FPR:.1%} FPR = {score:.2%}")
         if score > best_score:
@@ -259,8 +266,7 @@ def main(argv: list[str] | None = None) -> int:
     log("Scored evaluation sets")
     a, b = platt_fit(z["val"], y["val"], args.calib_spam_share)
     probs = {name: 1 / (1 + np.exp(-(a * v + b))) for name, v in z.items()}
-    t_high = threshold_at_fpr(probs["val"], y["val"], GATE_FPR)
-    t_low = min(threshold_at_fpr(probs["val"], y["val"], 0.05), t_high)
+    t_low, t_high = gate_thresholds(probs["val"], y["val"], val_synthetic, GATE_FPR)
     results = [
         evaluate(
             name,
@@ -283,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True)
     tokenizer.save_pretrained(out / "tokenizer")
 
-    class LogitsOnly(nn.Module):  # type: ignore[misc]
+    class LogitsOnly(nn.Module):
         def __init__(self, inner: Any) -> None:
             super().__init__()
             self.inner = inner
@@ -309,36 +315,48 @@ def main(argv: list[str] | None = None) -> int:
         opset_version=17,
         dynamo=False,
     )
-    quantize_dynamic(str(fp32_path), str(int8_path), weight_type=QuantType.QInt8)
+    # Per-channel scales: per-tensor int8 lost 2.2-3.0 points of recall at matched FPR on the
+    # 7 Nov 2026 model; per-channel lost at most 0.36, at the same 23 MB.
+    quantize_dynamic(str(fp32_path), str(int8_path), weight_type=QuantType.QInt8, per_channel=True)
 
     # M8/R9: compare both on CPU, the way it will be served, one message at a time.
     test = sets["test (production tier)"]
-    picks = rng.permutation(test.num_rows)[: args.quant_eval_rows]
+    picks = rng.permutation(test.num_rows)
+    if args.quant_eval_rows > 0:
+        picks = picks[: args.quant_eval_rows]
     ids_q = [set_ids["test (production tier)"][int(k)] for k in picks]
     y_q = y["test (production tier)"][picks]
 
-    def run_onnx(path: Path) -> tuple[npt.NDArray[np.float64], list[float]]:
+    def run_onnx(
+        path: Path, rows_ids: list[list[int]]
+    ) -> tuple[npt.NDArray[np.float64], list[float]]:
         session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
         scores, times = [], []
-        for ids in ids_q:
+        for ids in rows_ids:
             feed = {
                 "input_ids": np.array([ids], dtype=np.int64),
                 "attention_mask": np.ones((1, len(ids)), dtype=np.int64),
             }
             begin = time.perf_counter()
-            logits = session.run(["logits"], feed)[0]
+            logits: Any = session.run(["logits"], feed)[0]
             times.append(time.perf_counter() - begin)
             scores.append(spam_logit(logits.astype(np.float64))[0])
         z_q = np.array(scores, dtype=np.float64)
         return 1 / (1 + np.exp(-(a * z_q + b))), times
 
     log(f"Comparing fp32 and int8 on {len(ids_q):,} rows on CPU")
-    p_fp32, t_fp32 = run_onnx(fp32_path)
-    p_int8, t_int8 = run_onnx(int8_path)
-    r_fp32, r_int8 = rates_at(p_fp32, y_q, t_high), rates_at(p_int8, y_q, t_high)
+    p_fp32, t_fp32 = run_onnx(fp32_path, ids_q)
+    p_int8, t_int8 = run_onnx(int8_path, ids_q)
+    # Quantising shifts the scores, so int8 serves with its own thresholds from validation.
+    log(f"Setting int8 thresholds on {len(set_ids['val']):,} validation rows on CPU")
+    p_val_int8, _ = run_onnx(int8_path, set_ids["val"])
+    int8_t_low, int8_t_high = gate_thresholds(p_val_int8, y["val"], val_synthetic, GATE_FPR)
+    r_fp32, r_int8 = rates_at(p_fp32, y_q, t_high), rates_at(p_int8, y_q, int8_t_high)
     recall_loss = r_fp32["recall"].value - r_int8["recall"].value
     quant = {
         "rows": len(ids_q),
+        "int8_t_low": int8_t_low,
+        "int8_t_high": int8_t_high,
         "fp32_recall": r_fp32["recall"].value,
         "int8_recall": r_int8["recall"].value,
         "fp32_fpr": r_fp32["fpr"].value,
@@ -385,8 +403,9 @@ def main(argv: list[str] | None = None) -> int:
             f"{train.num_rows:,} training rows ({int(y_train.sum()):,} spam) · "
             f"best epoch {best_epoch + 1}",
             "",
-            f"Thresholds from validation: t_low={t_low:.4f} (<= 5% FPR), "
-            f"t_high={t_high:.4f} (<= {GATE_FPR:.1%} FPR). "
+            f"Thresholds from validation, on all ham and on synthetic ham alone: "
+            f"t_low={t_low:.4f} (<= 5% FPR), t_high={t_high:.4f} (<= {GATE_FPR:.1%} FPR). "
+            f"int8 uses its own: t_low={int8_t_low:.4f}, t_high={int8_t_high:.4f}. "
             f"Calibrated as if {args.calib_spam_share:.0%} of messages were spam.",
             "",
             "> Not the PRD gate: no metric here is measured on real contact-form messages.",

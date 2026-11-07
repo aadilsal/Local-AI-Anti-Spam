@@ -12,7 +12,7 @@ Audit of every data source the models may touch, as required by PRD §13 ("Re-ch
 | Source | Rows kept (spam / ham) | Licence | Obligation when we ship | Original | Owner check |
 |---|---:|---|---|---|---|
 | `uci_sms`: UCI SMS Spam Collection | 587 / 4,492 | CC BY 4.0 | Attribute in dataset card, model card and plugin readme | archive.ics.uci.edu/dataset/228 | ⬜ |
-| `youtube_spam`: UCI YouTube Spam Collection | 750 / 835 | CC BY 4.0 | Attribute | archive.ics.uci.edu/dataset/380 | ⬜ |
+| `youtube_spam`, `youtube_train`: UCI YouTube Spam Collection. Since 7 Nov 2026, `youtube_train` is the Psy, Katy Perry and LMFAO videos and `youtube_spam` is Eminem and Shakira, kept as the unseen holdout | 750 / 835 | CC BY 4.0 | Attribute | archive.ics.uci.edu/dataset/380 | ⬜ |
 | `india_sms`: India Spam SMS Classification | 662 / 1,247 | MIT | Keep copyright + licence notice with redistributed data | github.com/junioralive/india-spam-sms-classification | ⬜ |
 | `bitext_support`: Bitext customer support | 0 / 23,863 | CDLA-Sharing-1.0 | If we **redistribute the data** (HF dataset), it must stay under CDLA-Sharing. Trained models are "Results" and are not bound | github.com/bitext/customer-support-llm-chatbot-training-dataset | ⬜ |
 | `banking77`: BANKING77 | 0 / 13,022 | CC BY 4.0 | Attribute | github.com/PolyAI-LDN/task-specific-datasets | ⬜ |
@@ -46,7 +46,7 @@ Non-commercial, research-only, or copyright kept by senders.
 
 | Source | PRD use | Status |
 |---|---|---|
-| `Deysi/spam-detection-dataset` | Train with caution | Not included (Hugging Face unreachable when the corpus was built). Provenance undocumented (review note R10): if added, tag it so a retrain without it is one flag |
+| `Deysi/spam-detection-dataset` | Train with caution | Added 7 Nov 2026 as `deysi_spam`, **evaluation only** (`unclear`). The card tags it Apache-2.0 but states no origin (R10); its ham looks like Reddit posts, which the uploader can't relicense, and its spam looks machine-written (our reading). Changing its tier is the owner's decision |
 | Synthetic contact-form set | Main training data | Generator built (`laas/synth/`, Kaggle notebook). Generators, checked on Hugging Face 18 Oct 2026: **Qwen/Qwen2.5-7B-Instruct(-AWQ): Apache-2.0**; **microsoft/Phi-4-mini-instruct: MIT**. Both place no conditions on outputs. `laas.synth.ingest` refuses rows from any generator not listed in `GENERATOR_LICENCES`. Local runs use the 4-bit Ollama builds `qwen2.5:7b` and `phi4-mini`; each row records the tag and weights digest |
 | Hand-labelled real messages | **Test only** | Collecting (beta call). `split_policy = test_only` |
 | Opt-in user corrections | Train from model v3 | After launch, under our consent terms |

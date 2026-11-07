@@ -57,9 +57,14 @@ strict = true
 files = ["laas"]
 
 [[tool.mypy.overrides]]
-# vllm, torch and transformers are only installed on the GPU notebook, not locally.
+# vllm only runs on the GPU notebook; torch and transformers come with the optional cloud extra.
 module = ["datasketch.*", "sklearn.*", "scipy.*", "pyarrow.*", "vllm.*", "torch.*", "transformers.*", "onnxruntime.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# nn.Module is Any when the cloud extra isn't installed, and a real class when it is.
+module = ["laas.train_cloud"]
+disallow_subclassing_any = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

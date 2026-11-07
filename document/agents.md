@@ -57,6 +57,9 @@ python -m laas.data.public
 ollama pull qwen2.5:7b && ollama pull phi4-mini
 python -m laas.synth.gen --backend ollama --generator qwen2.5-7b --model qwen2.5:7b --n-requests 4000 --max-model-len 2048 --num-gpu 99 --out data/synthetic/qwen2.5-7b.jsonl
 python -m laas.synth.gen --backend ollama --generator phi-4-mini --model phi4-mini --n-requests 4000 --max-model-len 4096 --max-tokens 2400 --out data/synthetic/phi-4-mini.jsonl
+# Targeted top-up from the 7 Nov 2026 error analysis: --focus uses FOCUS_GRID in spec.py. Keep separate output files.
+python -m laas.synth.gen --backend ollama --generator qwen2.5-7b --model qwen2.5:7b --focus --n-requests 2000 --max-model-len 2048 --num-gpu 99 --out data/synthetic/qwen2.5-7b-focus.jsonl
+python -m laas.synth.gen --backend ollama --generator phi-4-mini --model phi4-mini --focus --n-requests 2000 --max-model-len 4096 --max-tokens 2400 --out data/synthetic/phi-4-mini-focus.jsonl
 python -m laas.synth.notebook          # rebuild notebooks/generate_synthetic.ipynb after editing spec.py/gen.py
 python -m laas.synth.ingest            # data/synthetic/*.jsonl -> data/processed/synthetic_v1.parquet
 python -m laas.train_local --data data/processed/public_v1.parquet --extra data/processed/synthetic_v1.parquet --holdout youtube_spam

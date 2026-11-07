@@ -96,7 +96,7 @@ def write(fh: TextIO, req: Request, reply: str, args: argparse.Namespace, checkp
 
 def run_vllm(reqs: Sequence[Request], args: argparse.Namespace, fh: TextIO) -> int:
     log("STAGE importing vLLM")
-    from vllm import LLM, SamplingParams
+    from vllm import LLM, SamplingParams  # pyright: ignore[reportMissingImports]
 
     log(f"STAGE loading {args.model} with vLLM (the first run downloads it: a few minutes)")
     started = time.time()
@@ -143,12 +143,13 @@ def run_transformers(reqs: Sequence[Request], args: argparse.Namespace, fh: Text
     if args.fallback_4bit:
         from transformers import BitsAndBytesConfig
 
-        kwargs["quantization_config"] = BitsAndBytesConfig(
+        bnb_config: Any = BitsAndBytesConfig  # transformers leaves this one untyped
+        kwargs["quantization_config"] = bnb_config(
             load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16
         )
     log(f"STAGE loading {checkpoint} with transformers (4-bit: {args.fallback_4bit})")
     started = time.time()
-    model = AutoModelForCausalLM.from_pretrained(checkpoint, **kwargs)
+    model: Any = AutoModelForCausalLM.from_pretrained(checkpoint, **kwargs)
     log(f"STAGE model loaded in {time.time() - started:.0f}s; generating")
     total = 0
     n_batches = -(-len(reqs) // args.hf_batch)
@@ -274,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Ollama: model layers on the GPU; 99 = all, when its estimate leaves some on the CPU",
     )
     parser.add_argument("--n-requests", type=int, default=200)
+    parser.add_argument("--focus", action="store_true", help="Use the targeted top-up grid")
     parser.add_argument("--seed", type=int, default=20261018)
     parser.add_argument("--out", type=Path, required=True)
     # Small enough that progress shows every minute or two; vLLM still batches efficiently.
@@ -284,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--temperature", type=float, default=0.95)
     args = parser.parse_args(argv)
 
-    reqs = build_requests(args.n_requests, args.seed, args.generator)
+    reqs = build_requests(args.n_requests, args.seed, args.generator, args.focus)
     drop_partial_line(args.out)
     done = done_ids(args.out)
     todo = [r for r in reqs if r.request_id not in done]
