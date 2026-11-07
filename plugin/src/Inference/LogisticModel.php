@@ -31,6 +31,15 @@ final class LogisticModel {
 	}
 
 	/**
+	 * Header values of the model file (model_version, t_low, t_high, ...).
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function header(): array {
+		return $this->file->header();
+	}
+
+	/**
 	 * Raw logit for already-featurized input.
 	 *
 	 * @param array{hashed: array<int, float>, dense: float[]} $features Featurizer output.

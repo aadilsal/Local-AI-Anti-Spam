@@ -21,4 +21,20 @@ define( 'LAAS_VERSION', '0.0.1' );
 define( 'LAAS_FILE', __FILE__ );
 define( 'LAAS_DIR', plugin_dir_path( __FILE__ ) );
 
-// The autoloader, service container and hooks arrive in S5-01 (see document/architecture.md §2).
+// The plugin has no runtime Composer dependencies, so it ships its own PSR-4 autoloader.
+spl_autoload_register(
+	static function ( $class_name ) {
+		$prefix = 'LocalAIAntiSpam\\';
+		if ( 0 !== strpos( $class_name, $prefix ) ) {
+			return;
+		}
+		$path = LAAS_DIR . 'src/' . str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) ) . '.php';
+		if ( is_readable( $path ) ) {
+			require $path;
+		}
+	}
+);
+
+require LAAS_DIR . 'src/functions.php';
+
+LocalAIAntiSpam\Plugin::boot();

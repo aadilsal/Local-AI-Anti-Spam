@@ -16,6 +16,14 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 7 Nov 2026: local model exported into the plugin; plugin core started
+
+- **Export:** `python -m laas.export --run runs/20261107-095859-production` wrote `plugin/model/model.bin` (2,099,155 bytes, under the 3 MB M3 limit; `t_low` 0.5817, `t_high` 0.9748), `parity/release-fixtures.json` (93 inputs) and `training/eval/report.md`. It refuses experiment runs, a featurizer version mismatch, thresholds out of order and files over 3 MB. **Development build only:** the PRD gates need the real test set.
+- **Parity on the shipped model:** PHP matches Python's score within 5e-5 on all 93 inputs (`ReleaseModelTest`), alongside the existing 233-case parity suite.
+- **Benchmark (PHP 8.3 on this PC):** worst case, an 8 KB message, p95 3.5 ms (budget 20 ms); 8.1 MB peak extra memory (budget 16 MB). Loading takes 1.6 ms, or 16 ms with the once-per-version checksum. Shared hosting will be slower, so CI should keep running the benchmark.
+- **Plugin core:** `Classifier\Pipeline` (empty and language gates, model, thresholds from `model.bin` plus the Relaxed/Balanced/Strict offset, a +0.05 lean for messages under 5 words, fail-open on any error), `Submission`, `Verdict`, `LanguageGate`, a `laas_log` ring buffer with no message content, the public `laas_classify()` and the `laas_pre_classify`, `laas_score`, `laas_thresholds` and `laas_verdict` filters, and the first integration: WordPress comments (spam goes to core's Spam list; logged-in users are trusted). PHPUnit: 354 tests pass, and PHPCS (WordPress-Extra, PHP 7.4 compatibility) is clean.
+- **Not yet:** quarantine table, rules, admin screens, Contact Form 7 and WPForms adapters, uninstall, and WordPress integration tests through wp-env (Docker needs virtualisation turned on).
+
 ### 7 Nov 2026: third model runs, with every intent measured and per-channel int8
 
 Both used `public_v1` + `synthetic_v1` with the new split, production mode, holding out `youtube_spam`: 96,549 training rows (18,079 spam). Runs: `20261107-095859-production` and `20261107-101019-cloud-production` (best epoch 3). **No PRD gate is measured here, because no metric uses real contact-form messages.** The split changed, so these numbers can't be compared row for row with earlier runs.

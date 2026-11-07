@@ -42,9 +42,15 @@ npx wp-env run cli wp plugin check local-ai-anti-spam   # Plugin Check (T8)
 # Python (from training/)
 uv sync                               # or: pip install -r requirements.lock
 pytest                                # unit tests incl. featurizer + split-policy guards
-python -m laas.train --config configs/local-v1.yaml
-python -m laas.export --run runs/<id>  # writes plugin/model/model.bin + parity/fixtures.json
-python -m laas.eval --run runs/<id>    # runs the gates, writes eval/report.md
+python -m laas.parity                 # regenerate parity/fixtures.json + parity-model.bin (after featurizer changes)
+python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + parity/release-fixtures.json + training/eval/report.md
+# Not built yet: laas.train (config-driven) and laas.eval --run (gates on the real test set).
+
+# PHP on the owner's PC: PHP 8.3 from winget (no 7.4 build there; CI covers 7.4) and
+# Composer at C:/Users/butta/tools/composer.phar. Docker (for wp-env) needs virtualisation on.
+#   php C:/Users/butta/tools/composer.phar install   (from plugin/)
+#   php vendor/bin/phpunit; php vendor/bin/phpcs
+#   php tests/bench/inference-bench.php model/model.bin
 
 # On the owner's PC, F: is a USB hard drive, so the environment and data live on the C: SSD through junctions:
 #   training/.venv -> C:/Users/butta/.venvs/laas-training (plain "uv run" and VS Code just work)
