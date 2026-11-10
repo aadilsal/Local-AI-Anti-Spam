@@ -8,7 +8,7 @@
  * @package LocalAIAntiSpam
  */
 
-// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped, WordPress.DB.DirectDatabaseQuery -- CLI test script.
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped, WordPress.DB.DirectDatabaseQuery, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- CLI test script; it calls core's privacy filters.
 
 use LocalAIAntiSpam\Classifier\Submission;
 use LocalAIAntiSpam\Classifier\Verdict;
