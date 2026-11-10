@@ -75,6 +75,7 @@ jobs:
         shell: pwsh
         run: |
           $ids = npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/admin-seed.php 2>$null | Where-Object { $_ -match '^\d+ \d+ \d+$' } | Select-Object -Last 1
+          if (-not $ids) { Write-Output '::error title=admin-check::admin-seed.php printed no row IDs'; exit 1 }
           ./tests/wp/admin-check.ps1 -Ids $ids
       - name: Plugin Check (WordPress.org)
         run: |

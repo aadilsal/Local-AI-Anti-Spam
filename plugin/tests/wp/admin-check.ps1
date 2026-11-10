@@ -15,7 +15,10 @@ $script:failed = $false
 
 function Check([string]$what, [bool]$ok) {
     Write-Output ("{0} {1}" -f ($(if ($ok) { 'ok  ' } else { 'FAIL' }), $what))
-    if (-not $ok) { $script:failed = $true }
+    if (-not $ok) {
+        $script:failed = $true
+        if ($env:GITHUB_ACTIONS) { Write-Output "::error title=admin-check::$what" } # Shows as an annotation.
+    }
 }
 
 function Login([string]$user, [string]$pass, [string]$jar) {
