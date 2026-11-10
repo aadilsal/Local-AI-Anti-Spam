@@ -66,6 +66,12 @@ Check 'detail explains the threshold' ($detail.Body.Contains('Messages scoring')
 
 $nonce = [regex]::Match($list.Body, 'name="_wpnonce" value="([0-9a-f]+)"').Groups[1].Value
 Check 'list form carries a nonce' ($nonce -ne '')
+if ($nonce -eq '' -and $env:GITHUB_ACTIONS) {
+    # Show what the page actually contained (CI logs need a login; annotations don't).
+    $start = [Math]::Max(0, $list.Body.IndexOf('id="wpbody-content"'))
+    $snippet = ($list.Body.Substring($start, [Math]::Min(3000, $list.Body.Length - $start)) -replace '\s+', ' ')
+    Write-Output "::error title=list page body::$snippet"
+}
 
 $noNonce = Request $admin $page @("laas_row_action=delete:$evil")
 Check "POST without nonce refused ($($noNonce.Code))" ($noNonce.Code -eq 403)
