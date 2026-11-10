@@ -17,9 +17,9 @@ global $wpdb;
 $wpdb->query( 'TRUNCATE TABLE ' . LocalAIAntiSpam\Quarantine\Installer::table() ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Fixed table name.
 delete_option( 'laas_test_mail' );
 
-$laas_repo  = LocalAIAntiSpam\Plugin::instance()->repository();
-$laas_xss   = '<script>alert(1)</script><img src=x onerror=alert(2)>"\'><svg onload=alert(3)>';
-$laas_evil  = new Submission( 'cf7', "Buy now {$laas_xss} javascript:alert(4) https://evil.example", 'x@evil.example', $laas_xss, '0', '192.0.2.66', array() );
+$laas_repo   = LocalAIAntiSpam\Plugin::instance()->repository();
+$laas_xss    = '<script>alert(1)</script><img src=x onerror=alert(2)>"\'><svg onload=alert(3)>';
+$laas_evil   = new Submission( 'cf7', "Buy now {$laas_xss} javascript:alert(4) https://evil.example", 'x@evil.example', $laas_xss, '0', '192.0.2.66', array() );
 $laas_evil_v = new Verdict(
 	Verdict::SPAM,
 	0.9999,
@@ -32,7 +32,7 @@ $laas_evil_v = new Verdict(
 	),
 	'local-test'
 );
-$laas_id1 = $laas_repo->hold( $laas_evil, $laas_evil_v, "your-message: {$laas_xss}\nyour-name: {$laas_xss}" );
+$laas_id1    = $laas_repo->hold( $laas_evil, $laas_evil_v, "your-message: {$laas_xss}\nyour-name: {$laas_xss}" );
 
 // A plausible enquiry held by mistake, on a real CF7 form, so "Not spam" can deliver it.
 $laas_forms = get_posts(
