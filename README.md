@@ -6,20 +6,25 @@
 
 **No CAPTCHA · No API key · No check limits · Nothing sent off your site**
 
-[![Status: in development](https://img.shields.io/badge/status-in%20development-orange)](#roadmap)
+[![CI](https://github.com/aadilsal/Local-AI-Anti-Spam/actions/workflows/ci.yml/badge.svg)](https://github.com/aadilsal/Local-AI-Anti-Spam/actions/workflows/ci.yml)
+[![Status: beta](https://img.shields.io/badge/status-beta%200.1.0-yellow)](#project-status)
 [![License: GPL v2+](https://img.shields.io/badge/license-GPLv2%2B-blue)](#license)
 [![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777bb4)](#requirements)
 [![WordPress 6.0+](https://img.shields.io/badge/WordPress-6.0%2B-21759b)](#requirements)
-[![Contact Form 7](https://img.shields.io/badge/Contact%20Form%207-planned%20for%20launch-lightgrey)](#integrations)
-[![WPForms](https://img.shields.io/badge/WPForms-planned%20for%20launch-lightgrey)](#integrations)
+[![Contact Form 7](https://img.shields.io/badge/Contact%20Form%207-supported-brightgreen)](#integrations)
+[![WPForms](https://img.shields.io/badge/WPForms-supported-brightgreen)](#integrations)
 
-[How it works](#how-it-works) · [Why it's different](#why-its-different) · [Free vs Pro](#free-vs-pro) · [FAQ](#faq) · [For developers](#for-developers) · [The ML](#under-the-hood-the-model) · [Docs](document/README.md)
+[Status](#project-status) · [How it works](#how-it-works) · [Try it](#try-it) · [FAQ](#faq) · [For developers](#for-developers) · [The ML](#under-the-hood-the-model) · [Docs](document/README.md)
 
 </div>
 
 ---
 
-> **Project status:** in active development, and not yet in the WordPress.org directory. The accuracy figures on this page are **launch targets**, not measured results. Real numbers will be published here, with confidence intervals, once the model has been evaluated on real contact-form messages. ⭐ Star or watch the repo to hear when it launches.
+## Project status
+
+**Beta (0.1.0).** The free plugin works end to end with Contact Form 7, WPForms and WordPress comments, and every push is tested in a real WordPress install. It is **not yet in the WordPress.org directory**.
+
+The one thing missing before a public launch is a measurement on **real** contact-form traffic. All model numbers on this page come from public datasets and synthetic messages; real-world numbers, with confidence intervals, will be published once enough consented beta messages have been labelled. If you run a site with a busy contact form, [volunteer as a beta site](../../issues).
 
 ## The problem
 
@@ -57,6 +62,18 @@ flowchart LR
 3. Clear cases are settled on your server. Unsure cases are delivered with a tag (free), or get a second opinion from a larger model (Pro).
 4. If anything goes wrong, such as a missing model file or an error, the message is **delivered**. It fails open, always.
 
+## Try it
+
+The beta isn't in the WordPress.org directory yet, so install it from a build:
+
+```bash
+git clone https://github.com/aadilsal/Local-AI-Anti-Spam.git
+cd Local-AI-Anti-Spam/plugin
+php bin/build-zip.php          # writes dist/local-ai-anti-spam.zip (needs PHP 7.4+ with zip)
+```
+
+Then in WordPress: **Plugins → Add New → Upload Plugin**, choose the zip, activate. Protection starts at once for every supported form plugin it finds; held messages appear under **Anti-Spam → Quarantine**.
+
 ## Why it's different
 
 | | **Local AI Anti-Spam** | Akismet | CleanTalk | ActiveLayer | Antispam Bee |
@@ -74,16 +91,16 @@ flowchart LR
 
 ## Free vs Pro
 
-The free plugin is complete on its own: no locked features, no nag screens, no trial timer.
+The free plugin is complete on its own: no locked features, no nag screens, no trial timer. **Pro and Agency are planned, not built yet**; the table shows what they will add.
 
-| | Free | Pro | Agency |
+| | Free | Pro *(planned)* | Agency *(planned)* |
 |---|:---:|:---:|:---:|
 | Local ML filtering, unlimited checks | ✅ | ✅ | ✅ |
 | Contact Form 7, WPForms, comments | ✅ | ✅ | ✅ |
-| Gravity Forms, Elementor, Fluent Forms *(soon after launch)* | ✅ | ✅ | ✅ |
+| Gravity Forms, Elementor, Fluent Forms *(planned)* | ✅ | ✅ | ✅ |
 | Quarantine with one-click release | ✅ | ✅ | ✅ |
 | "Why was this held?" explanations | ✅ | ✅ | ✅ |
-| Allow and block lists that learn from your corrections | ✅ | ✅ | ✅ |
+| Allow and block lists (email, domain, IP, phrase), with "always allow" after a release | ✅ | ✅ | ✅ |
 | Email digest of held messages | ✅ | ✅ | ✅ |
 | Dashboard widget | ✅ | ✅ | ✅ |
 | **Cloud second opinion** on borderline messages | | ✅ | ✅ |
@@ -106,7 +123,7 @@ Pro only ever sends the *borderline* messages to our server. Clear cases still n
 
 Privacy is the reason this plugin exists, so the rules are strict and enforced by tests:
 
-- The free plugin makes **no outbound network requests**, unless you choose to share corrections to help improve the model. That is off by default, explained in plain words, and redacts emails, phone numbers and names before anything is sent.
+- The free plugin makes **no outbound network requests**. (Opt-in sharing of corrections to improve the model is planned; it will be off by default and redact emails, phone numbers and names before anything is sent.)
 - Held messages are deleted automatically after your retention period (default 30 days).
 - Uninstalling removes every table and setting the plugin created.
 - It supports WordPress's built-in personal-data export and erase tools, and adds suggested text to your privacy policy page.
@@ -116,19 +133,17 @@ Privacy is the reason this plugin exists, so the rules are strict and enforced b
 
 - WordPress **6.0** or later
 - PHP **7.4** or later. Only standard extensions are needed: no `mbstring`, `intl` or `curl` required.
-- Works on ordinary shared hosting. The model file is under 3 MB, and a check is designed to take under 20 ms and under 16 MB of memory.
+- Works on ordinary shared hosting. The model file is 2.1 MB. Measured on a desktop PC (PHP 8.3), the worst case, an 8 KB message, takes 3.5 ms (p95) and 8.1 MB of extra memory; CI enforces a budget of 20 ms and 16 MB.
 
 ## Integrations
 
-| Form plugin | Status |
-|---|---|
-| Contact Form 7 | 🛠️ At launch |
-| WPForms | 🛠️ At launch |
-| WordPress comments | 🛠️ At launch |
-| Gravity Forms | 🗓️ Within two months of launch |
-| Elementor Forms | 🗓️ Within two months of launch |
-| Fluent Forms | 🗓️ Within two months of launch |
-| Ninja Forms, Formidable, Jetpack Forms | 🗓️ Later |
+| Form plugin | Status | Notes |
+|---|---|---|
+| Contact Form 7 | ✅ Supported (tested with 6.2) | Held visitors see CF7's usual error message. Release rebuilds CF7's own email; uploaded files can't be resent because CF7 deletes them |
+| WPForms | ✅ Supported (tested with Lite 2.0) | Held visitors see the normal confirmation. Release re-sends the form's own notifications |
+| WordPress comments | ✅ Supported | Spam goes to WordPress's Spam list; logged-in users are trusted |
+| Gravity Forms, Elementor Forms, Fluent Forms | 🗓️ Planned | |
+| Ninja Forms, Formidable, Jetpack Forms | 🗓️ Later | |
 
 Want another one? [Open an issue](../../issues) with the plugin name.
 
@@ -167,7 +182,7 @@ It should: it runs inside your form plugin's own spam check, on form submission 
 <details>
 <summary><b>What languages does it support?</b></summary>
 
-English at launch. Messages in other languages are delivered and labelled "not checked", never blocked by guesswork. More languages are planned after launch.
+English only for now. Messages in other languages are delivered and labelled "not checked", never blocked by guesswork. More languages are planned.
 </details>
 
 <details>
@@ -183,8 +198,8 @@ The plugin exposes a small, stable API (semver), and the Pro add-on uses exactly
 ```php
 // Classify any text: no side effects, nothing stored.
 $result = laas_classify( 'Hi! We can get your site to page 1 of Google…' );
-// [ 'label' => 'spam', 'score' => 0.97, 'reason' => 'model',
-//   'model_version' => 'local-2026.11.1', 'top_features' => [...] ]
+// [ 'label' => 'spam', 'score' => 0.99, 'reason' => 'model',
+//   'model_version' => 'local-baseline-20261107-0958', 'top_features' => [...] ]
 
 // Never quarantine messages from your own domain.
 add_filter( 'laas_verdict', function ( $verdict, $submission ) {
@@ -200,39 +215,55 @@ add_filter( 'laas_verdict', function ( $verdict, $submission ) {
 add_action( 'laas_quarantined', function ( $item_id, $verdict, $submission ) { /* … */ }, 10, 3 );
 ```
 
-The full hook list is in [architecture.md §9](document/architecture.md#9-public-developer-api-f17). Names use the working `laas_` prefix and may change before the first release.
+Filters: `laas_pre_classify`, `laas_score`, `laas_thresholds`, `laas_verdict`, `laas_quarantine_capability`. Actions: `laas_classified`, `laas_quarantined`, `laas_released`. Details in [architecture.md §9](document/architecture.md#9-public-developer-api-f17). Names use the working `laas_` prefix and may change before the first public release.
+
+### Working on the code
+
+| | |
+|---|---|
+| Plugin (`plugin/`) | `composer install`, then `composer test` (PHPUnit) and `composer lint` (WordPress coding standards, PHP 7.4 syntax). `php tests/bench/inference-bench.php model/model.dat` checks the speed budget |
+| Real WordPress (`plugin/`) | `npm ci --ignore-scripts`, then `npx wp-env start` (Docker) gives a site at `localhost:8888` with CF7 and WPForms. The end-to-end checks in `plugin/tests/wp/` are listed in [agents.md](document/agents.md#3-commands) |
+| Training (`training/`) | `uv sync`, then `pytest`, `ruff check .` and `mypy`. Data building, generation and training commands are in [agents.md](document/agents.md#3-commands) |
+
+CI runs all of this on every push: PHP 7.4, 8.1 and 8.3; the Python checks; and a WordPress job that installs CF7 and WPForms, sends real submissions, checks escaping, nonces and permissions over HTTP, and runs WordPress.org's Plugin Check.
 
 ## Under the hood: the model
 
 This project is also an open, end-to-end ML case study: **dataset → training → evaluation → deployment in plain PHP**.
 
-| | Local model (free) | Cloud model (Pro) |
+| | Local model (in the free plugin) | Cloud model (for Pro, trained, not deployed) |
 |---|---|---|
-| Type | Logistic regression on hashed word 1–2-grams + character 3–5-grams + link/sender features | Fine-tuned small transformer (MiniLM-L6), multi-class over spam subtypes |
-| Runs in | Pure PHP 7.4+, ≤ 3 MB weights file, no extensions | ONNX Runtime, 8-bit quantised, on CPU |
-| Calibrated | Yes: a score of 0.9 means about 90% of messages at that score are spam | Yes |
-| Target false-positive rate on real enquiries | ≤ 0.5% | ≤ 0.3% |
-| Target spam recall at that rate | ≥ 85% *(estimate)* | ≥ 95% *(estimate)* |
+| Type | Logistic regression on hashed word 1–2-grams + character 3–5-grams + link/sender features | Fine-tuned MiniLM-L6, multi-class over spam subtypes |
+| Runs in | Pure PHP 7.4+, 2.1 MB weights file, no extensions | ONNX Runtime on CPU, 8-bit (23 MB) |
+| Training data | 96,549 rows from licence-checked public datasets and the training split of a ~50,000-message synthetic contact-form set, generated locally (Qwen2.5-7B, Phi-4-mini) | Same |
+| Genuine messages held, synthetic test set | **0.33%** (95% CI 0.19–0.58%) | **0.17%** (95% CI 0.08–0.36%) |
+| Spam caught at that rate | **90.5%** | **91.0%** |
+| Target on *real* enquiries (PRD gate) | ≤ 0.5% held, ≥ 85% caught | ≤ 0.3% held, ≥ 95% caught |
+
+Measured numbers are from the [training log](document/training-log.md) and [eval report](training/eval/report.md). They are **not** the shipping gate: that needs a hand-labelled set of real contact-form messages, which is being collected.
 
 Some of the interesting engineering:
 
-- **Bit-exact parity between Python and PHP.** A custom featurizer uses `crc32` hashing (identical in both languages) and locale-free normalisation. A shared fixture suite proves PHP and Python agree to four decimal places.
-- **2 MB of weights, about 2 MB of memory.** PHP never unpacks the weights into an array. It reads only the few hundred buckets a message touches, straight from the binary file.
-- **Leak-free evaluation.** Splits are grouped by source and by synthetic template. Every metric is reported on a hand-labelled set of *real* contact-form messages, with confidence intervals, never on the easy public benchmarks.
-- **Distillation.** From v2, the local model also learns from the cloud model's soft labels.
-- **Licence-clean data.** Every training row records its source and licence, so any dataset can be pulled and the model retrained.
+- **Exact parity between Python and PHP.** A custom featurizer uses `crc32` hashing (identical in both languages) and locale-free normalisation. Shared fixtures prove PHP and Python agree to four decimal places, on a test model and on the model that ships.
+- **2 MB of weights, about 8 MB of memory.** PHP never unpacks the weights into an array. It reads only the few hundred buckets a message touches, straight from the binary file.
+- **Leak-free evaluation.** Splits are grouped by source and by synthetic template, so test styles are never seen in training; the training log records the bugs this caught.
+- **Generator-style confound handled.** Synthetic text is reweighted so the generator's writing style can't become a spam signal, and rule-based checks drop generated rows whose text contradicts their label.
+- **Quantisation that keeps its accuracy.** Per-channel int8 cut the cloud model's recall loss from 2–3 points to under 0.4, at a quarter of the size.
+- **Licence-clean data.** Every training row records its source and licence; only permissively licensed rows can reach training, enforced in code ([LICENCES.md](training/LICENCES.md)).
+- **Trained on one desktop GPU** (RTX 2060, 6 GB), including the synthetic data generation.
 
-The dataset card, model card and evaluation reports will be published on Hugging Face at launch.
+Planned: distilling the cloud model into the local one, and dataset and model cards on Hugging Face.
 
 ## Roadmap
 
-- [ ] **Weeks 1–2: data foundation.** Licence audit, synthetic data generator, 500 real messages hand-labelled, baseline model.
-- [ ] **Weeks 3–4: models v1.** Merged dataset on Hugging Face, transformer fine-tuned, evaluation report, final gates.
-- [ ] **Weeks 3–6: free plugin.** PHP inference passing parity tests; Contact Form 7, WPForms, comments; quarantine; submitted to WordPress.org.
-- [ ] **~Week 9: launch.** Live in the directory once WordPress.org review completes; Pro on sale.
-- [ ] **Weeks 10–13:** Gravity Forms, Elementor, Fluent Forms; distilled local model v2.
-- [ ] **Weeks 14–19:** opt-in corrections, sales-pitch folder, per-form-plugin guides.
-- [ ] **Weeks 20–26:** agency dashboard; model v3 trained on consented real data (once enough has been shared).
+- [x] **Data foundation:** licence audit, public data rebuilt from source, synthetic generator running on a local GPU.
+- [x] **Models v1:** local and cloud models trained and evaluated (on public and synthetic data).
+- [x] **Free plugin:** PHP inference with parity tests; Contact Form 7, WPForms, comments; quarantine, rules, digest, dashboard widget, privacy tools; WordPress.org Plugin Check clean of errors.
+- [ ] **Real test set:** 500 hand-labelled contact-form messages from beta sites, then the PRD gates. *(In progress: needs beta sites.)*
+- [ ] **Launch:** submit to WordPress.org once the gates pass.
+- [ ] **Pro:** cloud API, Pro add-on, product site.
+- [ ] **Reach:** Gravity Forms, Elementor, Fluent Forms; distilled local model v2.
+- [ ] **Later:** opt-in corrections, sales-pitch folder, agency dashboard, model v3 on consented real data.
 
 <sub>Timings depend on things outside our control, mainly real-world data arriving and the WordPress.org review queue.</sub>
 
@@ -240,14 +271,15 @@ The dataset card, model card and evaluation reports will be published on Hugging
 
 ```
 plugin/          Free WordPress plugin (GPLv2+): what ships to WordPress.org
-pro/             Pro add-on
-inference-php/   Standalone PHP inference library
-training/        Python: dataset, featurizer, training, export, evaluation
+  src/             Inference (pure PHP), classifier pipeline, integrations, quarantine, rules, admin
+  model/           model.dat: the exported local model
+  tests/           PHPUnit unit tests, wp-env end-to-end checks, latency benchmark
+training/        Python: data building, synthetic generation, featurizer, training, export
 parity/          Shared PHP ↔ Python test fixtures
-cloud-api/       FastAPI + ONNX Runtime classification service
-site/            Product website
-document/        PRD, architecture, design, security analysis, contributor guide
+document/        PRD, architecture, design, security analysis, training log, release steps
 ```
+
+Planned folders: `pro/` (Pro add-on), `cloud-api/` (FastAPI + ONNX Runtime), `inference-php/` (standalone PHP library), `site/` (product website).
 
 ## Documentation
 
@@ -258,15 +290,15 @@ document/        PRD, architecture, design, security analysis, contributor guide
 | [Architecture](document/architecture.md) | Components, model format, integrations, cloud, training |
 | [Design](document/design.md) | Screens, flows, copy, accessibility |
 | [Security analysis](document/security-analysis.md) | Threat model and controls |
+| [Training log](document/training-log.md) | Every data build and model run, with results and the bugs found |
+| [Release steps](document/release.md) | Build, checks, beta and WordPress.org release |
 | [Contributor and agent guide](document/agents.md) | Commands, rules and conventions for working in this repo |
 
 ## Contributing
 
-Contributions are welcome once the first code lands. In the meantime:
-
 - **Run a WordPress site with a busy contact form?** Real, consented examples of spam and genuine enquiries are the most valuable thing this project needs. [Open an issue](../../issues) to volunteer as a beta site.
-- **Found a design or security problem in the docs?** Issues and PRs are welcome.
-- Please read [document/agents.md](document/agents.md) before opening a code PR.
+- **Found a bug, or a design or security problem?** Issues and PRs are welcome.
+- Please read [document/agents.md](document/agents.md) before opening a code PR; CI must pass.
 
 Security issues: please report privately (see `SECURITY.md`, published with the first release) rather than in a public issue.
 
@@ -274,7 +306,7 @@ Security issues: please report privately (see `SECURITY.md`, published with the 
 
 - Plugin code and the PHP inference library: **GPLv2 or later**, as WordPress.org requires.
 - Model weights: published openly with each release.
-- Training datasets keep their original licences, listed in the dataset card (for example, the UCI SMS and YouTube spam collections are CC BY 4.0).
+- Training datasets keep their original licences, listed with their attributions in [training/LICENCES.md](training/LICENCES.md) and the plugin's `readme.txt` (for example, the UCI SMS and YouTube spam collections are CC BY 4.0).
 
 <div align="center">
 <sub>Built by Aadil Salman Butt. Local, private spam filtering that is unlimited and free to run.</sub>
