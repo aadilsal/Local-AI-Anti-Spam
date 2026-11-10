@@ -16,6 +16,12 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 10 Nov 2026: WPForms
+
+- **Adapter** (checked against WPForms Lite 2.0.4): `wpforms_process_honeypot` at priority 20, after WPForms' own honeypot. It runs once fields are formatted and before any entry or email; returning a reason makes WPForms stop silently, so the visitor sees the normal confirmation (WPForms' own behaviour for spam it catches). Password, hidden, payment, card, captcha, signature and file fields are neither classified nor stored.
+- **Release** re-sends the form's notifications through WPForms' public `entry_email()` with the stored fields. It counts as delivered only if a mail actually went out (`wp_mail_succeeded`, or a mail plugin short-circuiting `pre_wp_mail` with success); if notifications are off for the form, release reports failure and the row stays held.
+- **End to end in wp-env** (`tests/wp/wpforms-check.php`, through WPForms' own `process()`): a booking enquiry notified the admin; an SEO pitch (score 1.00) was held, sent no notification and showed no error; release sent the form's notification with its subject and the message. PHPUnit: 361 tests; PHPCS clean.
+
 ### 10 Nov 2026: admin screens
 
 - **Built (design.md §3.1, 3.2, 3.3, 3.7):** an Anti-Spam menu whose badge counts messages held since the user's last visit; the quarantine list (lowest score first, held and released views, search across sender and body, row and bulk *Not spam* / *Delete*, a five-segment score bar with a text alternative); the reason view (body as escaped plain text, score against the threshold in use, the words behind the score, links counted but never clickable); Settings → General (protection per integration, sensitivity, possible-spam tag, retention 1–365 days, store IP) and Settings → Diagnostics (model, thresholds, a three-sample self-test, the error log); and a one-time activation notice.

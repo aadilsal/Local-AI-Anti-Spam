@@ -14,6 +14,7 @@ use LocalAIAntiSpam\Integrations\Comments;
 use LocalAIAntiSpam\Integrations\ContactForm7;
 use LocalAIAntiSpam\Integrations\Integration;
 use LocalAIAntiSpam\Integrations\Releasable;
+use LocalAIAntiSpam\Integrations\WpForms;
 use LocalAIAntiSpam\Quarantine\Installer;
 use LocalAIAntiSpam\Quarantine\Releaser;
 use LocalAIAntiSpam\Quarantine\Repository;
@@ -95,6 +96,7 @@ final class Plugin {
 		$candidates = array(
 			new Comments( $this->pipeline() ),
 			new ContactForm7( $this->pipeline(), $this->repository() ),
+			new WpForms( $this->pipeline(), $this->repository() ),
 		);
 		foreach ( $candidates as $integration ) {
 			if ( ! $integration->is_available() ) {

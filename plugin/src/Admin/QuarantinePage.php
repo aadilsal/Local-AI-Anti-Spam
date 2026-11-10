@@ -323,6 +323,11 @@ final class QuarantinePage {
 			/* translators: %s: form title. */
 			return sprintf( __( '%s (Contact Form 7)', 'local-ai-anti-spam' ), '' !== $title ? $title : __( 'Contact form', 'local-ai-anti-spam' ) );
 		}
+		if ( 'wpforms' === $source ) {
+			$title = (int) $form_id > 0 ? get_the_title( (int) $form_id ) : '';
+			/* translators: %s: form title. */
+			return sprintf( __( '%s (WPForms)', 'local-ai-anti-spam' ), '' !== $title ? $title : __( 'Form', 'local-ai-anti-spam' ) );
+		}
 		return Admin::integration_name( $source );
 	}
 

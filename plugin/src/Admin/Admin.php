@@ -156,6 +156,7 @@ final class Admin {
 	public static function integration_name( string $id ): string {
 		$names = array(
 			'cf7'     => __( 'Contact Form 7', 'local-ai-anti-spam' ),
+			'wpforms' => __( 'WPForms', 'local-ai-anti-spam' ),
 			'comment' => __( 'Comments', 'local-ai-anti-spam' ),
 		);
 		return $names[ $id ] ?? $id;
