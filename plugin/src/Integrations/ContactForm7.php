@@ -110,6 +110,9 @@ final class ContactForm7 implements Integration, Releasable {
 			);
 
 			$verdict = $this->pipeline->classify( $item );
+			if ( \LocalAIAntiSpam\Classifier\Verdict::BORDERLINE === $verdict->label ) {
+				self::tag_subject();
+			}
 			if ( ! $verdict->is_spam() ) {
 				return false;
 			}
@@ -165,6 +168,31 @@ final class ContactForm7 implements Integration, Releasable {
 			}
 		}
 		return $sent;
+	}
+
+	/**
+	 * Borderline: deliver, but prefix the main mail's subject with the possible-spam tag (design.md
+	 * §3.7). Only the site owner's mail (`mail`), never the autoresponder (`mail_2`).
+	 *
+	 * @return void
+	 */
+	private static function tag_subject(): void {
+		$tag = trim( (string) \LocalAIAntiSpam\Support\Settings::get( 'subject_tag' ) );
+		if ( '' === $tag ) {
+			return;
+		}
+		add_filter(
+			'wpcf7_mail_components',
+			static function ( $components, $form = null, $mail = null ) use ( $tag ) {
+				$is_main = is_object( $mail ) && method_exists( $mail, 'name' ) && 'mail' === $mail->name();
+				if ( $is_main && is_array( $components ) && isset( $components['subject'] ) && 0 !== strpos( (string) $components['subject'], $tag ) ) {
+					$components['subject'] = $tag . ' ' . $components['subject'];
+				}
+				return $components;
+			},
+			10,
+			3
+		);
 	}
 
 	/**

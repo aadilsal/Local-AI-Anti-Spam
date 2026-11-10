@@ -17,21 +17,19 @@ use LocalAIAntiSpam\Integrations\Releasable;
 use LocalAIAntiSpam\Quarantine\Installer;
 use LocalAIAntiSpam\Quarantine\Releaser;
 use LocalAIAntiSpam\Quarantine\Repository;
+use LocalAIAntiSpam\Support\Settings;
 
 /**
  * The plugin's single entry point.
  */
 final class Plugin {
 
-	const SETTINGS_OPTION        = 'laas_settings';
-	const VERIFIED_OPTION        = 'laas_model_verified'; // Plugin version whose model passed the checksum.
-	const OFFSETS                = array(
+	const VERIFIED_OPTION = 'laas_model_verified'; // Plugin version whose model passed the checksum.
+	const OFFSETS         = array(
 		'relaxed'  => 0.04,
 		'balanced' => 0.0,
 		'strict'   => -0.04,
 	);
-	const DEFAULT_STRENGTH       = 'balanced';
-	const DEFAULT_RETENTION_DAYS = 30;
 
 	/**
 	 * The instance.
@@ -83,10 +81,13 @@ final class Plugin {
 		add_action( 'plugins_loaded', array( $plugin, 'register_integrations' ) );
 		add_action( 'plugins_loaded', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( Installer::RETENTION_HOOK, array( $plugin, 'run_retention' ) );
+		if ( is_admin() ) {
+			( new Admin\Admin( $plugin ) )->register();
+		}
 	}
 
 	/**
-	 * Register every integration whose form plugin is active.
+	 * Hook up every integration whose form plugin is active and whose protection is switched on.
 	 *
 	 * @return void
 	 */
@@ -96,11 +97,23 @@ final class Plugin {
 			new ContactForm7( $this->pipeline(), $this->repository() ),
 		);
 		foreach ( $candidates as $integration ) {
-			if ( $integration->is_available() ) {
+			if ( ! $integration->is_available() ) {
+				continue;
+			}
+			$this->integrations[ $integration->id() ] = $integration; // Still releases if switched off.
+			if ( Settings::protects( $integration->id() ) ) {
 				$integration->register();
-				$this->integrations[ $integration->id() ] = $integration;
 			}
 		}
+	}
+
+	/**
+	 * Integrations whose form plugin is active, by ID.
+	 *
+	 * @return array<string, Integration>
+	 */
+	public function integrations(): array {
+		return $this->integrations;
 	}
 
 	/**
@@ -148,9 +161,7 @@ final class Plugin {
 	 * @return void
 	 */
 	public function run_retention(): void {
-		$settings = (array) get_option( self::SETTINGS_OPTION, array() );
-		$days     = isset( $settings['retention_days'] ) ? max( 1, (int) $settings['retention_days'] ) : self::DEFAULT_RETENTION_DAYS;
-		$this->repository()->purge_older_than( $days );
+		$this->repository()->purge_older_than( max( 1, (int) Settings::get( 'retention_days' ) ) );
 	}
 
 	/**
@@ -173,8 +184,6 @@ final class Plugin {
 	 * @return float
 	 */
 	public static function t_high_offset(): float {
-		$settings = (array) get_option( self::SETTINGS_OPTION, array() );
-		$strength = isset( $settings['strength'] ) ? (string) $settings['strength'] : self::DEFAULT_STRENGTH;
-		return self::OFFSETS[ $strength ] ?? 0.0;
+		return self::OFFSETS[ (string) Settings::get( 'strength' ) ] ?? 0.0;
 	}
 }

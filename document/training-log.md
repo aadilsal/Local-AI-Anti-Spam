@@ -16,6 +16,14 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 10 Nov 2026: admin screens
+
+- **Built (design.md §3.1, 3.2, 3.3, 3.7):** an Anti-Spam menu whose badge counts messages held since the user's last visit; the quarantine list (lowest score first, held and released views, search across sender and body, row and bulk *Not spam* / *Delete*, a five-segment score bar with a text alternative); the reason view (body as escaped plain text, score against the threshold in use, the words behind the score, links counted but never clickable); Settings → General (protection per integration, sensitivity, possible-spam tag, retention 1–365 days, store IP) and Settings → Diagnostics (model, thresholds, a three-sample self-test, the error log); and a one-time activation notice.
+- **Borderline CF7 mail** is delivered with the possible-spam tag on the site owner's subject (not on the autoresponder).
+- **Security:** every action is a POST checked with a nonce and `laas_manage_quarantine` (given to `manage_options` users, filterable); settings go through the Settings API with a sanitiser.
+- **Checked over HTTP in wp-env** (`tests/wp/admin-check.ps1`, 27 checks pass): XSS payloads in the name, body and feature fields come out escaped in the list and the reason view; a POST without a nonce gets 403; a subscriber gets 403 on the page and on actions; a logged-out visitor is sent to login; *Not spam* delivers, and a release that can't deliver reports failure and keeps the row held; bulk delete works; settings save and sanitise (retention capped at 365, HTML stripped from the tag, per-integration switches kept); the self-test passes 3 of 3. A borderline CF7 message arrived as `[Possible spam] … "Quick question"`.
+- **Not yet:** the "Always allow this sender" step after *Not spam* (needs the Rules screen), the dashboard widget, the digest email and latency figures in Diagnostics.
+
 ### 10 Nov 2026: quarantine and Contact Form 7
 
 - **Quarantine:** `wp_laas_quarantine` (architecture §6.1) is created on activation and on a schema-version bump; a daily `laas_retention` cron deletes rows older than 30 days (setting `retention_days`) in batches of 500; `uninstall.php` drops the table, options, cron and comment meta. The sender IP is stored only while the `store_ip` setting is on (default).

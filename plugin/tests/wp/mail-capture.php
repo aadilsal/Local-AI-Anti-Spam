@@ -6,6 +6,16 @@
  * @package LocalAIAntiSpam
  */
 
+// Messages containing this marker score between the thresholds, to test borderline handling.
+add_filter(
+	'laas_score',
+	static function ( $score, $submission ) {
+		return false !== strpos( $submission->text, 'LAAS-BORDERLINE' ) ? 0.8 : $score;
+	},
+	10,
+	2
+);
+
 add_filter(
 	'pre_wp_mail',
 	static function ( $result, $atts ) {

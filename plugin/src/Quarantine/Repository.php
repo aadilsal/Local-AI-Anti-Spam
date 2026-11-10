@@ -101,12 +101,12 @@ final class Repository {
 		$where  = $wpdb->prepare( 'status = %s', $status );
 		if ( '' !== $search ) {
 			$like   = '%' . $wpdb->esc_like( $search ) . '%';
-			$where .= $wpdb->prepare( ' AND (sender_email LIKE %s OR sender_name LIKE %s OR subject_line LIKE %s)', $like, $like, $like );
+			$where .= $wpdb->prepare( ' AND (sender_email LIKE %s OR sender_name LIKE %s OR subject_line LIKE %s OR body LIKE %s)', $like, $like, $like, $like );
 		}
 		$offset = max( 0, ( $page - 1 ) * $per_page );
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared -- Our own table; $where is prepared above and $column/$dir come from allow-lists.
 		$rows  = $wpdb->get_results(
-			$wpdb->prepare( "SELECT id, created_at, source, form_id, status, verdict, score, reason, sender_email, sender_name, subject_line, released_at FROM {$table} WHERE {$where} ORDER BY {$column} {$dir}, id DESC LIMIT %d OFFSET %d", $per_page, $offset ),
+			$wpdb->prepare( "SELECT id, created_at, source, form_id, status, verdict, score, reason, top_features, sender_email, sender_name, subject_line, released_at FROM {$table} WHERE {$where} ORDER BY {$column} {$dir}, id DESC LIMIT %d OFFSET %d", $per_page, $offset ),
 			ARRAY_A
 		);
 		$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where}" );
@@ -126,6 +126,37 @@ final class Repository {
 		global $wpdb;
 		$table = Installer::table();
 		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", self::HELD ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table.
+	}
+
+	/**
+	 * Rows per status, for the list views.
+	 *
+	 * @return array<string, int>
+	 */
+	public function counts(): array {
+		global $wpdb;
+		$table  = Installer::table();
+		$rows   = $wpdb->get_results( "SELECT status, COUNT(*) AS n FROM {$table} GROUP BY status", ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table, no input.
+		$counts = array(
+			self::HELD     => 0,
+			self::RELEASED => 0,
+		);
+		foreach ( (array) $rows as $row ) {
+			$counts[ (string) $row['status'] ] = (int) $row['n'];
+		}
+		return $counts;
+	}
+
+	/**
+	 * Held rows created after a time, for the menu badge.
+	 *
+	 * @param string $since UTC datetime 'Y-m-d H:i:s'.
+	 * @return int
+	 */
+	public function count_held_since( string $since ): int {
+		global $wpdb;
+		$table = Installer::table();
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s AND created_at > %s", self::HELD, $since ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table.
 	}
 
 	/**
@@ -183,7 +214,6 @@ final class Repository {
 	 * @return bool
 	 */
 	private static function store_ip(): bool {
-		$settings = (array) get_option( 'laas_settings', array() );
-		return ! isset( $settings['store_ip'] ) || (bool) $settings['store_ip'];
+		return (bool) \LocalAIAntiSpam\Support\Settings::get( 'store_ip' );
 	}
 }

@@ -59,7 +59,11 @@ python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + par
 # CF7 end to end: cf7-setup.php prints a form ID; post two messages to
 #   http://localhost:8888/wp-json/contact-form-7/v1/contact-forms/<id>/feedback (curl -F, with
 #   _wpcf7=<id> and _wpcf7_unit_tag=wpcf7-f<id>-o1), then run cf7-check.php. Mail is captured,
-#   not sent, by tests/wp/mail-capture.php (copied into mu-plugins by cf7-setup.php).
+#   not sent, by tests/wp/mail-capture.php (copied into mu-plugins by cf7-setup.php); that file
+#   also makes any message containing LAAS-BORDERLINE score 0.8, to test borderline handling.
+# Admin screens over HTTP (escaping, nonces, capabilities, release, delete, settings):
+#   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/admin-seed.php   # prints 3 IDs
+#   powershell -File tests\wp\admin-check.ps1 -Ids "<the 3 IDs>"
 
 # On the owner's PC, F: is a USB hard drive, so the environment and data live on the C: SSD through junctions:
 #   training/.venv -> C:/Users/butta/.venvs/laas-training (plain "uv run" and VS Code just work)

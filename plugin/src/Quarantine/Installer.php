@@ -15,7 +15,8 @@ final class Installer {
 	const DB_VERSION        = 1;
 	const DB_VERSION_OPTION = 'laas_db_version';
 	const RETENTION_HOOK    = 'laas_retention';
-	const OPTIONS           = array( 'laas_settings', 'laas_db_version', 'laas_log', 'laas_model_verified' );
+	const NOTICE_OPTION     = 'laas_activation_notice';
+	const OPTIONS           = array( 'laas_settings', 'laas_db_version', 'laas_log', 'laas_model_verified', 'laas_activation_notice' );
 
 	/**
 	 * Quarantine table name, with this site's prefix.
@@ -34,6 +35,7 @@ final class Installer {
 	 * @return void
 	 */
 	public static function activate( $network_wide = false ): void {
+		update_option( self::NOTICE_OPTION, 1, false ); // Shown once (design.md §3.1).
 		if ( $network_wide && function_exists( 'get_sites' ) ) {
 			foreach ( get_sites( array( 'fields' => 'ids' ) ) as $site_id ) {
 				switch_to_blog( (int) $site_id );
@@ -129,5 +131,6 @@ final class Installer {
 		wp_clear_scheduled_hook( self::RETENTION_HOOK );
 		delete_metadata( 'comment', 0, 'laas_verdict', '', true );
 		delete_metadata( 'comment', 0, 'laas_score', '', true );
+		delete_metadata( 'user', 0, 'laas_quarantine_seen', '', true );
 	}
 }
