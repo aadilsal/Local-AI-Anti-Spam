@@ -51,6 +51,11 @@ python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + par
 #   php C:/Users/butta/tools/composer.phar install   (from plugin/)
 #   php vendor/bin/phpunit; php vendor/bin/phpcs
 #   php tests/bench/inference-bench.php model/model.bin
+# Local WordPress (from plugin/). Node 26 has no prebuilt fs-ext-extra-prebuilt (needed only by
+# WordPress Playground, not Docker), so install without scripts and call the local wp-env:
+#   npm ci --ignore-scripts
+#   node_modules\.bin\wp-env start          # http://localhost:8888, admin / password
+#   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/comments-smoke.php
 
 # On the owner's PC, F: is a USB hard drive, so the environment and data live on the C: SSD through junctions:
 #   training/.venv -> C:/Users/butta/.venvs/laas-training (plain "uv run" and VS Code just work)

@@ -22,7 +22,8 @@ A running record of data builds, generation runs and model runs: what was run, o
 - **Parity on the shipped model:** PHP matches Python's score within 5e-5 on all 93 inputs (`ReleaseModelTest`), alongside the existing 233-case parity suite.
 - **Benchmark (PHP 8.3 on this PC):** worst case, an 8 KB message, p95 3.5 ms (budget 20 ms); 8.1 MB peak extra memory (budget 16 MB). Loading takes 1.6 ms, or 16 ms with the once-per-version checksum. Shared hosting will be slower, so CI should keep running the benchmark.
 - **Plugin core:** `Classifier\Pipeline` (empty and language gates, model, thresholds from `model.bin` plus the Relaxed/Balanced/Strict offset, a +0.05 lean for messages under 5 words, fail-open on any error), `Submission`, `Verdict`, `LanguageGate`, a `laas_log` ring buffer with no message content, the public `laas_classify()` and the `laas_pre_classify`, `laas_score`, `laas_thresholds` and `laas_verdict` filters, and the first integration: WordPress comments (spam goes to core's Spam list; logged-in users are trusted). PHPUnit: 354 tests pass, and PHPCS (WordPress-Extra, PHP 7.4 compatibility) is clean.
-- **Not yet:** quarantine table, rules, admin screens, Contact Form 7 and WPForms adapters, uninstall, and WordPress integration tests through wp-env (Docker needs virtualisation turned on).
+- **In real WordPress (10 Nov 2026, wp-env, PHP 8.3):** `tests/wp/comments-smoke.php` posts comments through `wp_new_comment()`. A genuine comment scored 0.17 and was held only by core's first-comment moderation; an SEO pitch and crypto link spam scored 1.00 and went to Spam; a Russian comment was delivered unchecked. `laas_classify()` worked and nothing was logged. CI passed on PHP 7.4, 8.1 and 8.3.
+- **Not yet:** quarantine table, rules, admin screens, Contact Form 7 and WPForms adapters, uninstall, and running the WordPress test in CI.
 
 ### 7 Nov 2026: third model runs, with every intent measured and per-channel int8
 

@@ -1,6 +1,7 @@
 {
   "$schema": "https://schemas.wp.org/trunk/wp-env.json",
   "phpVersion": "8.3",
+  "testsEnvironment": false,
   "plugins": [],
   "mappings": {
     "wp-content/plugins/local-ai-anti-spam": "."
@@ -11,6 +12,6 @@
     "SCRIPT_DEBUG": true
   },
   "lifecycleScripts": {
-    "afterStart": "wp-env run cli wp plugin install contact-form-7 wpforms-lite --activate && wp-env run cli wp plugin activate local-ai-anti-spam"
+    "afterStart": "npx --no-install wp-env run cli wp plugin install contact-form-7 wpforms-lite --activate && npx --no-install wp-env run cli wp plugin activate local-ai-anti-spam"
   }
 }
