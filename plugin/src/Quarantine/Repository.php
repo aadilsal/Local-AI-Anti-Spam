@@ -160,6 +160,58 @@ final class Repository {
 	}
 
 	/**
+	 * Held rows, lowest score first, for the digest.
+	 *
+	 * @param string $since Only rows created after this UTC datetime.
+	 * @param int    $limit Rows.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function held_since( string $since, int $limit ): array {
+		global $wpdb;
+		$table = Installer::table();
+		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT id, sender_name, sender_email, subject_line, score FROM {$table} WHERE status = %s AND created_at > %s ORDER BY score ASC, id ASC LIMIT %d", self::HELD, $since, $limit ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table.
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Held rows scoring below a value (near the threshold), for the dashboard widget.
+	 *
+	 * @param float $below Score.
+	 * @return int
+	 */
+	public function count_held_below( float $below ): int {
+		global $wpdb;
+		$table = Installer::table();
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s AND score < %f", self::HELD, $below ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table.
+	}
+
+	/**
+	 * Rows from one sender, for the privacy exporter (C6).
+	 *
+	 * @param string $email    Sender email.
+	 * @param int    $page     1-based page.
+	 * @param int    $per_page Rows per page.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function by_email( string $email, int $page, int $per_page ): array {
+		global $wpdb;
+		$table = Installer::table();
+		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT id, created_at, source, status, sender_email, sender_name, sender_ip, body FROM {$table} WHERE sender_email = %s ORDER BY id LIMIT %d OFFSET %d", $email, $per_page, max( 0, ( $page - 1 ) * $per_page ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table.
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Delete every row from one sender, for the privacy eraser (C6).
+	 *
+	 * @param string $email Sender email.
+	 * @return int Rows deleted.
+	 */
+	public function delete_by_email( string $email ): int {
+		global $wpdb;
+		return (int) $wpdb->delete( Installer::table(), array( 'sender_email' => $email ), array( '%s' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Our own table.
+	}
+
+	/**
 	 * Mark a row released.
 	 *
 	 * @param int $id Row ID.

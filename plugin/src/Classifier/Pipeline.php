@@ -74,11 +74,17 @@ final class Pipeline {
 	 */
 	public function classify( Submission $submission ): Verdict {
 		try {
-			return $this->decide( $submission );
+			$verdict = $this->decide( $submission );
 		} catch ( \Throwable $error ) {
 			Log::error( 'classify', $error );
-			return Verdict::fail_open();
+			$verdict = Verdict::fail_open();
 		}
+		try {
+			do_action( 'laas_classified', $verdict, $submission ); // Counts (Stats); never changes the verdict.
+		} catch ( \Throwable $error ) {
+			Log::error( 'classified_hook', $error );
+		}
+		return $verdict;
 	}
 
 	/**

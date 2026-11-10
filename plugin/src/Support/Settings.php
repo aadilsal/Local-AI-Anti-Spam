@@ -15,6 +15,7 @@ final class Settings {
 	const OPTION = 'laas_settings';
 
 	const STRENGTHS = array( 'relaxed', 'balanced', 'strict' );
+	const DIGESTS   = array( 'off', 'daily', 'weekly' );
 
 	const DEFAULTS = array(
 		'strength'       => 'balanced',
@@ -22,6 +23,8 @@ final class Settings {
 		'store_ip'       => true,
 		'subject_tag'    => '[Possible spam]',
 		'protect'        => array(),
+		'digest'         => 'weekly',
+		'digest_to'      => '',
 	);
 
 	/**
@@ -70,6 +73,12 @@ final class Settings {
 		}
 		if ( isset( $input['retention_days'] ) ) {
 			$clean['retention_days'] = min( 365, max( 1, (int) $input['retention_days'] ) );
+		}
+		if ( isset( $input['digest'] ) && in_array( $input['digest'], self::DIGESTS, true ) ) {
+			$clean['digest'] = $input['digest'];
+		}
+		if ( isset( $input['digest_to'] ) ) {
+			$clean['digest_to'] = sanitize_email( (string) $input['digest_to'] );
 		}
 		$clean['store_ip']    = ! empty( $input['store_ip'] );
 		$clean['subject_tag'] = isset( $input['subject_tag'] ) ? substr( sanitize_text_field( (string) $input['subject_tag'] ), 0, 40 ) : $clean['subject_tag'];

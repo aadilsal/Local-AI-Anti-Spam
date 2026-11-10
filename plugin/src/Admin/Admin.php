@@ -52,6 +52,7 @@ final class Admin {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
 		add_action( 'admin_init', array( SettingsPage::class, 'register' ) );
 		add_action( 'admin_notices', array( $this, 'activation_notice' ) );
+		add_action( 'wp_dashboard_setup', array( new DashboardWidget( $this->plugin ), 'register' ) );
 	}
 
 	/**

@@ -12,11 +12,13 @@ namespace LocalAIAntiSpam\Quarantine;
  */
 final class Installer {
 
-	const DB_VERSION        = 2; // 2: laas_rules.
+	const DB_VERSION        = 3; // 2: laas_rules. 3: laas_stats_daily.
+	const DIGEST_HOOK       = 'laas_digest';
 	const DB_VERSION_OPTION = 'laas_db_version';
 	const RETENTION_HOOK    = 'laas_retention';
 	const NOTICE_OPTION     = 'laas_activation_notice';
-	const OPTIONS           = array( 'laas_settings', 'laas_db_version', 'laas_log', 'laas_model_verified', 'laas_activation_notice' );
+	const OPTIONS           = array( 'laas_settings', 'laas_db_version', 'laas_log', 'laas_model_verified', 'laas_activation_notice', 'laas_digest_last' );
+	const CRON_HOOKS        = array( 'laas_retention', 'laas_digest' );
 
 	/**
 	 * Quarantine table name, with this site's prefix.
@@ -53,7 +55,9 @@ final class Installer {
 	 * @return void
 	 */
 	public static function deactivate(): void {
-		wp_clear_scheduled_hook( self::RETENTION_HOOK );
+		foreach ( self::CRON_HOOKS as $hook ) {
+			wp_clear_scheduled_hook( $hook );
+		}
 	}
 
 	/**
@@ -65,8 +69,19 @@ final class Installer {
 		if ( (int) get_option( self::DB_VERSION_OPTION ) < self::DB_VERSION ) {
 			self::install();
 		}
-		if ( ! wp_next_scheduled( self::RETENTION_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::RETENTION_HOOK );
+		self::schedule();
+	}
+
+	/**
+	 * Daily retention and digest jobs (architecture.md §7).
+	 *
+	 * @return void
+	 */
+	private static function schedule(): void {
+		foreach ( self::CRON_HOOKS as $hook ) {
+			if ( ! wp_next_scheduled( $hook ) ) {
+				wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', $hook );
+			}
 		}
 	}
 
@@ -125,10 +140,23 @@ final class Installer {
 				UNIQUE KEY kind_value (kind,value)
 			) {$charset};"
 		);
+		$stats = \LocalAIAntiSpam\Stats\Stats::table();
+		dbDelta(
+			"CREATE TABLE {$stats} (
+				day date NOT NULL,
+				source varchar(32) NOT NULL,
+				checked int(10) unsigned NOT NULL DEFAULT 0,
+				clean int(10) unsigned NOT NULL DEFAULT 0,
+				borderline int(10) unsigned NOT NULL DEFAULT 0,
+				spam int(10) unsigned NOT NULL DEFAULT 0,
+				released int(10) unsigned NOT NULL DEFAULT 0,
+				unchecked int(10) unsigned NOT NULL DEFAULT 0,
+				errors int(10) unsigned NOT NULL DEFAULT 0,
+				PRIMARY KEY  (day,source)
+			) {$charset};"
+		);
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
-		if ( ! wp_next_scheduled( self::RETENTION_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::RETENTION_HOOK );
-		}
+		self::schedule();
 	}
 
 	/**
@@ -138,13 +166,13 @@ final class Installer {
 	 */
 	public static function uninstall_site(): void {
 		global $wpdb;
-		foreach ( array( self::table(), $wpdb->prefix . 'laas_rules' ) as $table ) {
+		foreach ( array( self::table(), $wpdb->prefix . 'laas_rules', $wpdb->prefix . 'laas_stats_daily' ) as $table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own tables; the names are not user input.
 		}
 		foreach ( self::OPTIONS as $option ) {
 			delete_option( $option );
 		}
-		wp_clear_scheduled_hook( self::RETENTION_HOOK );
+		self::deactivate();
 		delete_metadata( 'comment', 0, 'laas_verdict', '', true );
 		delete_metadata( 'comment', 0, 'laas_score', '', true );
 		delete_metadata( 'user', 0, 'laas_quarantine_seen', '', true );

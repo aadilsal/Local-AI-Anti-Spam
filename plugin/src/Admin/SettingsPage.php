@@ -122,6 +122,24 @@ final class SettingsPage {
 					<td><input type="number" id="laas-retention" class="small-text" min="1" max="365" name="<?php echo esc_attr( $name . '[retention_days]' ); ?>" value="<?php echo esc_attr( (string) $settings['retention_days'] ); ?>"> <?php esc_html_e( 'days', 'local-ai-anti-spam' ); ?></td>
 				</tr>
 				<tr>
+					<th scope="row"><?php esc_html_e( 'Email digest', 'local-ai-anti-spam' ); ?></th>
+					<td><fieldset>
+						<?php
+						$digests = array(
+							'off'    => __( 'Off', 'local-ai-anti-spam' ),
+							'daily'  => __( 'Daily', 'local-ai-anti-spam' ),
+							'weekly' => __( 'Weekly', 'local-ai-anti-spam' ),
+						);
+						foreach ( $digests as $value => $label ) :
+							?>
+							<label><input type="radio" name="<?php echo esc_attr( $name . '[digest]' ); ?>" value="<?php echo esc_attr( $value ); ?>" <?php checked( $settings['digest'], $value ); ?>> <?php echo esc_html( $label ); ?></label>&nbsp;&nbsp;
+						<?php endforeach; ?>
+						<p class="description"><?php esc_html_e( 'A short list of newly held messages, lowest score first. Sent only when something new was held.', 'local-ai-anti-spam' ); ?></p>
+						<label for="laas-digest-to"><?php esc_html_e( 'Send to', 'local-ai-anti-spam' ); ?></label>
+						<input type="email" id="laas-digest-to" class="regular-text" name="<?php echo esc_attr( $name . '[digest_to]' ); ?>" value="<?php echo esc_attr( (string) $settings['digest_to'] ); ?>" placeholder="<?php echo esc_attr( (string) get_option( 'admin_email' ) ); ?>">
+					</fieldset></td>
+				</tr>
+				<tr>
 					<th scope="row"><?php esc_html_e( 'Privacy', 'local-ai-anti-spam' ); ?></th>
 					<td>
 						<label><input type="checkbox" name="<?php echo esc_attr( $name . '[store_ip]' ); ?>" value="1" <?php checked( (bool) $settings['store_ip'] ); ?>> <?php esc_html_e( 'Store sender IP addresses with held messages', 'local-ai-anti-spam' ); ?></label>

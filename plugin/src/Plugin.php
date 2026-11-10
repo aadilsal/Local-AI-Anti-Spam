@@ -18,7 +18,10 @@ use LocalAIAntiSpam\Integrations\WpForms;
 use LocalAIAntiSpam\Quarantine\Installer;
 use LocalAIAntiSpam\Quarantine\Releaser;
 use LocalAIAntiSpam\Quarantine\Repository;
+use LocalAIAntiSpam\Privacy\Privacy;
 use LocalAIAntiSpam\Rules\Matcher;
+use LocalAIAntiSpam\Stats\Digest;
+use LocalAIAntiSpam\Stats\Stats;
 use LocalAIAntiSpam\Rules\RuleRepository;
 use LocalAIAntiSpam\Support\Settings;
 
@@ -91,6 +94,11 @@ final class Plugin {
 		add_action( 'plugins_loaded', array( $plugin, 'register_integrations' ) );
 		add_action( 'plugins_loaded', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( Installer::RETENTION_HOOK, array( $plugin, 'run_retention' ) );
+		add_action( Installer::RETENTION_HOOK, array( Stats::class, 'rollup' ) );
+		add_action( Installer::DIGEST_HOOK, array( $plugin, 'run_digest' ) );
+		add_action( 'laas_classified', array( Stats::class, 'record' ), 10, 2 );
+		add_action( 'laas_released', array( Stats::class, 'record_release' ), 10, 3 );
+		( new Privacy( $plugin->repository() ) )->register();
 		if ( is_admin() ) {
 			( new Admin\Admin( $plugin ) )->register();
 		}
@@ -199,6 +207,15 @@ final class Plugin {
 	 */
 	public function run_retention(): void {
 		$this->repository()->purge_older_than( max( 1, (int) Settings::get( 'retention_days' ) ) );
+	}
+
+	/**
+	 * Daily cron: send the digest when due (F15).
+	 *
+	 * @return void
+	 */
+	public function run_digest(): void {
+		( new Digest( $this->repository() ) )->run();
 	}
 
 	/**

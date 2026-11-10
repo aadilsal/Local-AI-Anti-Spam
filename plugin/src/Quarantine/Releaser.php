@@ -64,7 +64,7 @@ final class Releaser {
 		}
 		if ( $delivered ) {
 			$this->repository->mark_released( $id );
-			do_action( 'laas_released', $id, $user_id );
+			do_action( 'laas_released', $id, $user_id, (string) $item['source'] );
 		}
 		return $delivered;
 	}
