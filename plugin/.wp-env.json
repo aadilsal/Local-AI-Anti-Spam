@@ -12,6 +12,6 @@
     "SCRIPT_DEBUG": true
   },
   "lifecycleScripts": {
-    "afterStart": "npx --no-install wp-env run cli wp plugin install contact-form-7 wpforms-lite --activate && npx --no-install wp-env run cli wp plugin activate local-ai-anti-spam"
+    "afterStart": "npx --no-install wp-env run cli wp plugin install contact-form-7 wpforms-lite --activate && npx --no-install wp-env run cli wp option update wpforms_setup_wizard_disabled 1 && npx --no-install wp-env run cli wp transient delete wpforms_activation_redirect && npx --no-install wp-env run cli wp plugin activate local-ai-anti-spam"
   }
 }
