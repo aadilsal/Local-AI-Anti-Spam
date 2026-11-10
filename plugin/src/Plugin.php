@@ -1,6 +1,6 @@
 <?php
 /**
- * Wiring: builds the pipeline and registers the integrations (architecture.md §2).
+ * Wiring: builds the pipeline, quarantine and integrations, and registers hooks (architecture.md §2).
  *
  * @package LocalAIAntiSpam
  */
@@ -11,21 +11,27 @@ use LocalAIAntiSpam\Classifier\Pipeline;
 use LocalAIAntiSpam\Inference\LogisticModel;
 use LocalAIAntiSpam\Inference\ModelFile;
 use LocalAIAntiSpam\Integrations\Comments;
+use LocalAIAntiSpam\Integrations\ContactForm7;
 use LocalAIAntiSpam\Integrations\Integration;
+use LocalAIAntiSpam\Integrations\Releasable;
+use LocalAIAntiSpam\Quarantine\Installer;
+use LocalAIAntiSpam\Quarantine\Releaser;
+use LocalAIAntiSpam\Quarantine\Repository;
 
 /**
  * The plugin's single entry point.
  */
 final class Plugin {
 
-	const SETTINGS_OPTION  = 'laas_settings';
-	const VERIFIED_OPTION  = 'laas_model_verified'; // Plugin version whose model passed the checksum.
-	const OFFSETS          = array(
+	const SETTINGS_OPTION        = 'laas_settings';
+	const VERIFIED_OPTION        = 'laas_model_verified'; // Plugin version whose model passed the checksum.
+	const OFFSETS                = array(
 		'relaxed'  => 0.04,
 		'balanced' => 0.0,
 		'strict'   => -0.04,
 	);
-	const DEFAULT_STRENGTH = 'balanced';
+	const DEFAULT_STRENGTH       = 'balanced';
+	const DEFAULT_RETENTION_DAYS = 30;
 
 	/**
 	 * The instance.
@@ -40,6 +46,20 @@ final class Plugin {
 	 * @var Pipeline|null
 	 */
 	private $pipeline = null;
+
+	/**
+	 * The quarantine.
+	 *
+	 * @var Repository|null
+	 */
+	private $repository = null;
+
+	/**
+	 * Integrations registered on this request, by ID.
+	 *
+	 * @var array<string, Integration>
+	 */
+	private $integrations = array();
 
 	/**
 	 * The instance.
@@ -59,7 +79,10 @@ final class Plugin {
 	 * @return void
 	 */
 	public static function boot(): void {
-		add_action( 'plugins_loaded', array( self::instance(), 'register_integrations' ) );
+		$plugin = self::instance();
+		add_action( 'plugins_loaded', array( $plugin, 'register_integrations' ) );
+		add_action( 'plugins_loaded', array( Installer::class, 'maybe_upgrade' ) );
+		add_action( Installer::RETENTION_HOOK, array( $plugin, 'run_retention' ) );
 	}
 
 	/**
@@ -68,10 +91,14 @@ final class Plugin {
 	 * @return void
 	 */
 	public function register_integrations(): void {
-		$integrations = array( new Comments( $this->pipeline() ) );
-		foreach ( $integrations as $integration ) {
-			if ( $integration instanceof Integration && $integration->is_available() ) {
+		$candidates = array(
+			new Comments( $this->pipeline() ),
+			new ContactForm7( $this->pipeline(), $this->repository() ),
+		);
+		foreach ( $candidates as $integration ) {
+			if ( $integration->is_available() ) {
 				$integration->register();
+				$this->integrations[ $integration->id() ] = $integration;
 			}
 		}
 	}
@@ -86,6 +113,44 @@ final class Plugin {
 			$this->pipeline = new Pipeline( array( $this, 'load_model' ), self::t_high_offset() );
 		}
 		return $this->pipeline;
+	}
+
+	/**
+	 * The quarantine.
+	 *
+	 * @return Repository
+	 */
+	public function repository(): Repository {
+		if ( null === $this->repository ) {
+			$this->repository = new Repository();
+		}
+		return $this->repository;
+	}
+
+	/**
+	 * Releases held messages through the integration that held them.
+	 *
+	 * @return Releaser
+	 */
+	public function releaser(): Releaser {
+		$releasable = array_filter(
+			$this->integrations,
+			static function ( $integration ) {
+				return $integration instanceof Releasable;
+			}
+		);
+		return new Releaser( $this->repository(), $releasable );
+	}
+
+	/**
+	 * Daily cron: delete rows past the retention period (F6, C5).
+	 *
+	 * @return void
+	 */
+	public function run_retention(): void {
+		$settings = (array) get_option( self::SETTINGS_OPTION, array() );
+		$days     = isset( $settings['retention_days'] ) ? max( 1, (int) $settings['retention_days'] ) : self::DEFAULT_RETENTION_DAYS;
+		$this->repository()->purge_older_than( $days );
 	}
 
 	/**

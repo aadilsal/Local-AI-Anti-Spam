@@ -37,4 +37,7 @@ spl_autoload_register(
 
 require LAAS_DIR . 'src/functions.php';
 
+register_activation_hook( __FILE__, array( LocalAIAntiSpam\Quarantine\Installer::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( LocalAIAntiSpam\Quarantine\Installer::class, 'deactivate' ) );
+
 LocalAIAntiSpam\Plugin::boot();

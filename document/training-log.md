@@ -16,6 +16,13 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 10 Nov 2026: quarantine and Contact Form 7
+
+- **Quarantine:** `wp_laas_quarantine` (architecture §6.1) is created on activation and on a schema-version bump; a daily `laas_retention` cron deletes rows older than 30 days (setting `retention_days`) in batches of 500; `uninstall.php` drops the table, options, cron and comment meta. The sender IP is stored only while the `store_ip` setting is on (default).
+- **CF7 adapter** (checked against CF7 6.2.4.1): `wpcf7_spam` at priority 20, after CF7's own checks. The message comes from textareas and message-like text fields, sender email and name by field type, and fields that look sensitive (password, card, token, quiz, captcha) are neither classified nor stored. Spam is held with the posted values; if it can't be stored, it is delivered.
+- **Release:** rebuilds CF7's `mail` (and active `mail_2`) from the form's templates and the stored values, with special tags from stored meta, and sends it with `wp_mail`. Uploaded files can't be resent (CF7 deletes them), so file fields show their names. A failed delivery leaves the row held.
+- **End to end in wp-env**, through CF7's real REST endpoint: a booking enquiry was mailed; an SEO pitch (score 1.00) was held, and CF7 showed the visitor its usual error message. Releasing it sent CF7's mail to the admin with the original subject, body and Reply-To; the row became `released` and a second release was refused. No errors were logged. PHPUnit: 359 tests pass; PHPCS clean.
+
 ### 7 Nov 2026: local model exported into the plugin; plugin core started
 
 - **Export:** `python -m laas.export --run runs/20261107-095859-production` wrote `plugin/model/model.bin` (2,099,155 bytes, under the 3 MB M3 limit; `t_low` 0.5817, `t_high` 0.9748), `parity/release-fixtures.json` (93 inputs) and `training/eval/report.md`. It refuses experiment runs, a featurizer version mismatch, thresholds out of order and files over 3 MB. **Development build only:** the PRD gates need the real test set.

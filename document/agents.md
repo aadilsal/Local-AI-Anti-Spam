@@ -56,6 +56,10 @@ python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + par
 #   npm ci --ignore-scripts
 #   node_modules\.bin\wp-env start          # http://localhost:8888, admin / password
 #   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/comments-smoke.php
+# CF7 end to end: cf7-setup.php prints a form ID; post two messages to
+#   http://localhost:8888/wp-json/contact-form-7/v1/contact-forms/<id>/feedback (curl -F, with
+#   _wpcf7=<id> and _wpcf7_unit_tag=wpcf7-f<id>-o1), then run cf7-check.php. Mail is captured,
+#   not sent, by tests/wp/mail-capture.php (copied into mu-plugins by cf7-setup.php).
 
 # On the owner's PC, F: is a USB hard drive, so the environment and data live on the C: SSD through junctions:
 #   training/.venv -> C:/Users/butta/.venvs/laas-training (plain "uv run" and VS Code just work)
