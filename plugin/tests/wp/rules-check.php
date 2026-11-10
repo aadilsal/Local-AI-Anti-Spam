@@ -18,7 +18,7 @@ $laas_check  = static function ( string $what, bool $ok ) use ( &$laas_failed ) 
 global $wpdb;
 $laas_rules_table = LocalAIAntiSpam\Rules\RuleRepository::table();
 $laas_check( 'rules table exists after upgrade', $laas_rules_table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $laas_rules_table ) ) );
-$laas_check( 'schema version is 2', 2 === (int) get_option( 'laas_db_version' ) );
+$laas_check( 'schema version has the rules table (2+)', (int) get_option( 'laas_db_version' ) >= 2 );
 $wpdb->query( "TRUNCATE TABLE {$laas_rules_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed table name.
 
 $laas_rules = LocalAIAntiSpam\Plugin::instance()->rules();

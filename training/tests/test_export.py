@@ -45,7 +45,7 @@ def _args(tmp_path: Path, run: Path) -> list[str]:
 def test_export_writes_model_fixtures_and_report(tmp_path: Path) -> None:
     run = _run(tmp_path)
     assert main(_args(tmp_path, run)) == 0
-    shipped = tmp_path / "plugin" / "model" / "model.bin"
+    shipped = tmp_path / "plugin" / "model" / "model.dat"
     assert shipped.read_bytes() == (run / "model.bin").read_bytes()
 
     fixtures = json.loads((tmp_path / "parity" / "release-fixtures.json").read_text("utf-8"))
@@ -61,7 +61,7 @@ def test_export_refuses_experiment_runs_unless_asked(tmp_path: Path) -> None:
     run = _run(tmp_path, production=False)
     with pytest.raises(SystemExit):
         main(_args(tmp_path, run))
-    assert not (tmp_path / "plugin" / "model" / "model.bin").exists()
+    assert not (tmp_path / "plugin" / "model" / "model.dat").exists()
     assert main([*_args(tmp_path, run), "--allow-experiment"]) == 0
 
 

@@ -25,7 +25,7 @@ final class PipelineTest extends TestCase {
 	}
 
 	public static function load(): LogisticModel {
-		return new LogisticModel( ModelFile::load( dirname( __DIR__, 3 ) . '/model/model.bin' ) );
+		return new LogisticModel( ModelFile::load( dirname( __DIR__, 3 ) . '/model/model.dat' ) );
 	}
 
 	private static function pipeline( float $offset = 0.0 ): Pipeline {

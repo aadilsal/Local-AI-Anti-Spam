@@ -225,7 +225,7 @@ final class Plugin {
 	 */
 	public function load_model(): LogisticModel {
 		$verified = get_option( self::VERIFIED_OPTION ) === LAAS_VERSION;
-		$file     = ModelFile::load( LAAS_DIR . 'model/model.bin', ! $verified );
+		$file     = ModelFile::load( LAAS_DIR . 'model/model.dat', ! $verified );
 		if ( ! $verified ) {
 			update_option( self::VERIFIED_OPTION, LAAS_VERSION, false );
 		}

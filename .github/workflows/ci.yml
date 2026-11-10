@@ -33,6 +33,58 @@ jobs:
       - run: composer install --no-interaction --no-progress
       - run: composer lint
       - run: composer test
+      - name: Latency and memory budget (20 ms, 16 MB)
+        run: php tests/bench/inference-bench.php model/model.dat 100
+      - name: Release zip
+        run: php bin/build-zip.php
+
+  wordpress:
+    name: WordPress end to end
+    runs-on: ubuntu-latest
+    needs: php
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --ignore-scripts
+      - name: Start WordPress (wp-env, installs CF7 and WPForms)
+        run: npx --no-install wp-env start
+      - name: Comments
+        run: npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/comments-smoke.php
+      - name: Contact Form 7 through its REST endpoint, then release
+        run: |
+          FORM=$(npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/cf7-setup.php 2>/dev/null | grep -E '^[0-9]+$' | tail -1)
+          URL="http://localhost:8888/wp-json/contact-form-7/v1/contact-forms/$FORM/feedback"
+          COMMON="-s -F _wpcf7=$FORM -F _wpcf7_unit_tag=wpcf7-f$FORM-o1 -F _wpcf7_locale=en_US"
+          curl $COMMON -F 'your-name=Sarah Jones' -F 'your-email=sarah@example.com' -F 'your-subject=Table booking' \
+            -F 'your-message=Hi, could I book a table for four this Friday at 7pm? One of us is vegetarian. Thanks, Sarah' "$URL"
+          curl $COMMON -F 'your-name=Mark' -F 'your-email=mark@seo-boost.example' -F 'your-subject=Grow your traffic' \
+            -F 'your-message=Hello, I noticed your website is not ranking on the first page of Google. Our SEO agency can get you quality backlinks and more traffic. Reply for a free audit: https://seo-boost.example/offer' "$URL"
+          npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/cf7-check.php
+      - name: WPForms
+        run: npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/wpforms-check.php
+      - name: Rules
+        run: npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/rules-check.php
+      - name: Stats, digest, widget and privacy
+        run: npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/stats-check.php
+      - name: Admin screens over HTTP
+        shell: pwsh
+        run: |
+          $ids = npx --no-install wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/admin-seed.php 2>$null | Where-Object { $_ -match '^\d+ \d+ \d+$' } | Select-Object -Last 1
+          ./tests/wp/admin-check.ps1 -Ids $ids
+      - name: Plugin Check (WordPress.org)
+        run: |
+          npx --no-install wp-env run cli wp plugin install plugin-check --activate
+          npx --no-install wp-env run cli wp plugin check local-ai-anti-spam --format=csv \
+            --exclude-directories=tests,vendor,node_modules,bin,dist \
+            --exclude-files=composer.json,composer.lock,package.json,package-lock.json,phpcs.xml.dist,phpunit.xml.dist,.wp-env.json,.distignore,.phpunit.result.cache \
+            | tee plugin-check.csv
+          # Warnings are reviewed by hand; any ERROR fails the build.
+          ! grep -q ',ERROR,' plugin-check.csv
 
   python:
     name: Python (training)

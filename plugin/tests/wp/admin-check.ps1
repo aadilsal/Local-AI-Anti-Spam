@@ -1,9 +1,11 @@
 ﻿# Admin screens over HTTP against the wp-env site (http://localhost:8888), after admin-seed.php.
 # Checks escaping of hostile content (S1), nonces (S2), capability checks (S3), release and delete.
-# Usage (from plugin/): powershell -File tests\wp\admin-check.ps1 -Ids "1 2 3"
+# Usage (from plugin/): powershell -File tests\wp\admin-check.ps1 -Ids "1 2 3"   (pwsh on Linux in CI)
 param([Parameter(Mandatory = $true)][string]$Ids)
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell aliases "curl" to Invoke-WebRequest, so call the real binary by name there.
+$curl = if ($PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows) { 'curl.exe' } else { 'curl' }
 $base = 'http://localhost:8888'
 $page = "$base/wp-admin/admin.php?page=laas-quarantine"
 $evil, $real, $orphan = $Ids.Split(' ')
@@ -18,7 +20,7 @@ function Check([string]$what, [bool]$ok) {
 
 function Login([string]$user, [string]$pass, [string]$jar) {
     Remove-Item $jar -ErrorAction SilentlyContinue
-    curl.exe -s -o NUL -c $jar -b 'wordpress_test_cookie=WP%20Cookie%20check' `
+    & $curl -s -o (Join-Path $tmp 'login.html') -c $jar -b 'wordpress_test_cookie=WP%20Cookie%20check' `
         --data-urlencode "log=$user" --data-urlencode "pwd=$pass" -d 'wp-submit=Log+In&testcookie=1' "$base/wp-login.php"
 }
 
@@ -29,7 +31,7 @@ function Request([string]$jar, [string]$url, [string[]]$form = @()) {
     $curlArgs = @('-s', '-D', $headers, '-o', $bodyFile, '-b', $jar, '-c', $jar)
     foreach ($field in $form) { $curlArgs += @('--data-urlencode', $field) }
     $curlArgs += $url
-    curl.exe @curlArgs | Out-Null
+    & $curl @curlArgs | Out-Null
     $head = Get-Content $headers -Raw
     $code = [int]([regex]::Match($head, 'HTTP/\S+ (\d{3})').Groups[1].Value)
     $location = [regex]::Match($head, '(?im)^Location:\s*(\S+)').Groups[1].Value

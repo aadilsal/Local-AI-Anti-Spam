@@ -40,7 +40,7 @@ final class Comments implements Integration {
 	/**
 	 * Key of the comment last classified on this request, and its verdict. WordPress applies
 	 * `pre_comment_approved` twice for one new comment (from wp_allow_comment() and again from
-	 * wp_new_comment(), seen in WordPress 6.9), so the second call reuses the first verdict instead
+	 * wp_new_comment(), seen in WordPress 7.1), so the second call reuses the first verdict instead
 	 * of scoring again and counting rule hits twice.
 	 *
 	 * @var array{0: string, 1: Verdict}|null

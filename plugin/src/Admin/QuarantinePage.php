@@ -90,7 +90,7 @@ final class QuarantinePage {
 		if ( 'release' === $op && 1 === count( $ids ) && 0 === $failed ) {
 			$item = $this->plugin->repository()->find( $ids[0] );
 			if ( $item && '' !== (string) $item['sender_email'] ) {
-				$args['laas_sender'] = rawurlencode( (string) $item['sender_email'] );
+				$args['laas_sender'] = rawurlencode( (string) $item['sender_email'] ); // add_query_arg() doesn't encode; $_GET decodes once.
 			}
 		}
 		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
@@ -188,7 +188,7 @@ final class QuarantinePage {
 		$op     = sanitize_key( wp_unslash( $_GET['laas_done'] ) );
 		$ok     = isset( $_GET['laas_ok'] ) ? absint( $_GET['laas_ok'] ) : 0;
 		$failed = isset( $_GET['laas_failed'] ) ? absint( $_GET['laas_failed'] ) : 0;
-		$sender = isset( $_GET['laas_sender'] ) ? sanitize_email( rawurldecode( wp_unslash( $_GET['laas_sender'] ) ) ) : '';
+		$sender = isset( $_GET['laas_sender'] ) ? sanitize_email( wp_unslash( $_GET['laas_sender'] ) ) : '';
 		// phpcs:enable
 		if ( 'release' === $op && $ok > 0 ) {
 			echo '<div class="notice notice-success" tabindex="-1" id="laas-result"><p>';

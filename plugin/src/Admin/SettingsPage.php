@@ -165,7 +165,7 @@ final class SettingsPage {
 				__( 'Model', 'local-ai-anti-spam' )      => (string) $header['model_version'],
 				__( 'Trained', 'local-ai-anti-spam' )    => (string) ( $header['trained_at'] ?? '' ),
 				__( 'Thresholds', 'local-ai-anti-spam' ) => sprintf( 'clean < %.4f, spam ≥ %.4f (offset %+.2f)', (float) $header['t_low'], (float) $header['t_high'], Plugin::t_high_offset() ),
-				__( 'Model file', 'local-ai-anti-spam' ) => size_format( (int) filesize( LAAS_DIR . 'model/model.bin' ) ),
+				__( 'Model file', 'local-ai-anti-spam' ) => size_format( (int) filesize( LAAS_DIR . 'model/model.dat' ) ),
 				__( 'Plugin version', 'local-ai-anti-spam' ) => LAAS_VERSION,
 			);
 			$model_ok = true;

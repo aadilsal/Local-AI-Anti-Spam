@@ -1,7 +1,7 @@
 <?php
 /**
  * The model the plugin ships must score exactly as Python scored it (PRD M3). Fixtures come from
- * `python -m laas.export --run runs/<id>`, which writes them together with plugin/model/model.bin.
+ * `python -m laas.export --run runs/<id>`, which writes them together with plugin/model/model.dat.
  *
  * @package LocalAIAntiSpam
  */
@@ -31,7 +31,7 @@ final class ReleaseModelTest extends TestCase {
 	private static $model = null;
 
 	private static function model_path(): string {
-		return dirname( __DIR__, 3 ) . '/model/model.bin';
+		return dirname( __DIR__, 3 ) . '/model/model.dat';
 	}
 
 	private static function fixtures(): array {

@@ -1,0 +1,695 @@
+# Copyright (C) 2026 Aadil Salman Butt
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Local AI Anti-Spam 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/local-ai-anti-spam\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-11-10T06:16:01+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: local-ai-anti-spam\n"
+
+#. Plugin Name of the plugin
+#: local-ai-anti-spam.php
+#: src/Privacy/Privacy.php:156
+msgid "Local AI Anti-Spam"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: local-ai-anti-spam.php
+msgid "https://github.com/aadilsal/Local-AI-Anti-Spam"
+msgstr ""
+
+#. Description of the plugin
+#: local-ai-anti-spam.php
+msgid "Spam filtering for contact forms and comments, using a machine-learning model that runs on your own server. No CAPTCHA, no API key, no check limits."
+msgstr ""
+
+#. Author of the plugin
+#: local-ai-anti-spam.php
+msgid "Aadil Salman Butt"
+msgstr ""
+
+#. translators: %s: number of new held messages.
+#: src/Admin/Admin.php:82
+#, php-format
+msgid "%s new held message"
+msgid_plural "%s new held messages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/Admin.php:86
+msgid "Anti-Spam"
+msgstr ""
+
+#: src/Admin/Admin.php:87
+#: src/Admin/QuarantinePage.php:155
+msgid "Quarantine"
+msgstr ""
+
+#: src/Admin/Admin.php:89
+#: src/Admin/RulesPage.php:113
+msgid "Rules"
+msgstr ""
+
+#: src/Admin/Admin.php:90
+#: src/Admin/SettingsPage.php:69
+msgid "Anti-Spam Settings"
+msgstr ""
+
+#: src/Admin/Admin.php:90
+#: src/Admin/Admin.php:150
+msgid "Settings"
+msgstr ""
+
+#: src/Admin/Admin.php:131
+msgid "comments"
+msgstr ""
+
+#. translators: %s: list of protected form plugins, e.g. "Contact Form 7 and comments".
+#: src/Admin/Admin.php:138
+#, php-format
+msgid "Spam protection is on for %s."
+msgstr ""
+
+#: src/Admin/Admin.php:142
+msgid "Checks run on this server: nothing is sent anywhere."
+msgstr ""
+
+#. translators: %d: number of days.
+#: src/Admin/Admin.php:145
+#, php-format
+msgid "Messages flagged as spam are held for %d day, never deleted straight away."
+msgid_plural "Messages flagged as spam are held for %d days, never deleted straight away."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/Admin.php:149
+msgid "View quarantine"
+msgstr ""
+
+#: src/Admin/Admin.php:164
+msgid "Contact Form 7"
+msgstr ""
+
+#: src/Admin/Admin.php:165
+msgid "WPForms"
+msgstr ""
+
+#: src/Admin/Admin.php:166
+msgid "Comments"
+msgstr ""
+
+#: src/Admin/DashboardWidget.php:45
+msgid "Spam protection: last 30 days"
+msgstr ""
+
+#. translators: 1: messages checked, 2: messages held, 3: messages released.
+#: src/Admin/DashboardWidget.php:78
+#, php-format
+msgid "%1$s checked · %2$s held · %3$s released by you"
+msgstr ""
+
+#. translators: 1: number of messages, 2: score.
+#: src/Admin/DashboardWidget.php:93
+#, php-format
+msgid "%1$d held message scored under %2$s. Worth a quick look."
+msgid_plural "%1$d held messages scored under %2$s. Worth a quick look."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/DashboardWidget.php:100
+msgid "Nothing near the line. Looks clean."
+msgstr ""
+
+#: src/Admin/DashboardWidget.php:103
+msgid "Review quarantine"
+msgstr ""
+
+#. translators: 1: smallest daily count, 2: largest daily count.
+#: src/Admin/DashboardWidget.php:122
+#, php-format
+msgid "Held per day, last 30 days: min %1$d, max %2$d"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:60
+msgid "You are not allowed to manage the quarantine."
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:162
+msgid "Search messages"
+msgstr ""
+
+#. translators: %d: number of days.
+#: src/Admin/QuarantinePage.php:170
+#, php-format
+msgid "Messages are deleted automatically after %d day."
+msgid_plural "Messages are deleted automatically after %d days."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/QuarantinePage.php:172
+msgid "Change"
+msgstr ""
+
+#. translators: %d: number of messages.
+#: src/Admin/QuarantinePage.php:196
+#, php-format
+msgid "%d message delivered to its form's normal recipients."
+msgid_plural "%d messages delivered to their forms' normal recipients."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: sender email address.
+#: src/Admin/QuarantinePage.php:200
+#, php-format
+msgid "Always allow %s?"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:201
+#: src/Admin/RulesPage.php:130
+#: src/Admin/RulesPage.php:145
+msgid "Always allow"
+msgstr ""
+
+#. translators: %d: number of messages.
+#: src/Admin/QuarantinePage.php:211
+#, php-format
+msgid "Couldn't deliver %d message. Your site's email may not be working. It's still in quarantine."
+msgid_plural "Couldn't deliver %d messages. Your site's email may not be working. They're still in quarantine."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of messages.
+#: src/Admin/QuarantinePage.php:219
+#, php-format
+msgid "%d message deleted."
+msgid_plural "%d messages deleted."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/QuarantinePage.php:233
+msgid "Back to quarantine"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:235
+msgid "This message no longer exists. It may have been deleted after the retention period."
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:238
+#: src/Admin/QuarantineTable.php:179
+msgid "(no name)"
+msgstr ""
+
+#. translators: 1: form name, 2: score, 3: model version, 4: date.
+#: src/Admin/QuarantinePage.php:249
+#, php-format
+msgid "%1$s · Score %2$s · Model %3$s · Received %4$s"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:258
+#: src/Admin/QuarantineTable.php:66
+#: src/Privacy/Privacy.php:116
+msgid "Message"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:261
+msgid "Why this was held"
+msgstr ""
+
+#. translators: 1: this message's score, 2: the threshold.
+#: src/Admin/QuarantinePage.php:268
+#, php-format
+msgid "The model scored this %1$s. Messages scoring %2$s or more are held."
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:280
+msgid "Words that pushed it towards spam:"
+msgstr ""
+
+#. translators: %d: number of links.
+#: src/Admin/QuarantinePage.php:293
+msgid "Links: none"
+msgstr ""
+
+#. translators: %d: number of links.
+#: src/Admin/QuarantinePage.php:293
+#, php-format
+msgid "Links: %d (shown as text, not clickable)"
+msgid_plural "Links: %d (shown as text, not clickable)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/QuarantinePage.php:300
+msgid "Not spam: deliver it"
+msgstr ""
+
+#. translators: %s: date.
+#: src/Admin/QuarantinePage.php:304
+#, php-format
+msgid "Released %s."
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:307
+#: src/Admin/QuarantineTable.php:187
+msgid "Delete"
+msgstr ""
+
+#. translators: %s: form title.
+#: src/Admin/QuarantinePage.php:338
+#, php-format
+msgid "%s (Contact Form 7)"
+msgstr ""
+
+#. translators: %s: form title.
+#: src/Admin/QuarantinePage.php:338
+msgid "Contact form"
+msgstr ""
+
+#. translators: %s: form title.
+#: src/Admin/QuarantinePage.php:343
+#, php-format
+msgid "%s (WPForms)"
+msgstr ""
+
+#. translators: %s: form title.
+#: src/Admin/QuarantinePage.php:343
+#: src/Admin/QuarantineTable.php:67
+#: src/Privacy/Privacy.php:96
+msgid "Form"
+msgstr ""
+
+#. translators: %s: score.
+#: src/Admin/QuarantinePage.php:359
+#, php-format
+msgid "Score %s out of 1"
+msgstr ""
+
+#. translators: %s: the matching rule, e.g. "domain:seo-pros.example".
+#: src/Admin/QuarantinePage.php:377
+#, php-format
+msgid "On your block list (%s)"
+msgstr ""
+
+#: src/Admin/QuarantinePage.php:380
+msgid "Checks failed; held by mistake."
+msgstr ""
+
+#. translators: %s: comma-separated words.
+#: src/Admin/QuarantinePage.php:393
+msgid "Model score"
+msgstr ""
+
+#. translators: %s: comma-separated words.
+#: src/Admin/QuarantinePage.php:393
+#, php-format
+msgid "Words: %s"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:65
+msgid "From"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:68
+msgid "Score"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:69
+msgid "Why"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:70
+#: src/Privacy/Privacy.php:92
+msgid "Received"
+msgstr ""
+
+#. translators: %s: count.
+#: src/Admin/QuarantineTable.php:120
+#, php-format
+msgid "Held <span class=\"count\">(%s)</span>"
+msgstr ""
+
+#. translators: %s: count.
+#: src/Admin/QuarantineTable.php:122
+#, php-format
+msgid "Released <span class=\"count\">(%s)</span>"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:141
+msgid "Not spam: deliver"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:143
+msgid "Delete permanently"
+msgstr ""
+
+#. translators: %d: number of days.
+#: src/Admin/QuarantineTable.php:155
+#, php-format
+msgid "Nothing in quarantine. Spam that's caught will be held here for %d days, so you can check for real enquiries."
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:157
+msgid "No released messages."
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:184
+msgid "Not spam"
+msgstr ""
+
+#: src/Admin/QuarantineTable.php:186
+msgid "View"
+msgstr ""
+
+#. translators: %s: time difference, e.g. "2 hours".
+#: src/Admin/QuarantineTable.php:262
+#, php-format
+msgid "%s ago"
+msgstr ""
+
+#: src/Admin/RulesPage.php:76
+msgid "You are not allowed to manage rules."
+msgstr ""
+
+#: src/Admin/RulesPage.php:105
+#: src/Privacy/Privacy.php:108
+msgid "Email"
+msgstr ""
+
+#: src/Admin/RulesPage.php:106
+msgid "Domain"
+msgstr ""
+
+#: src/Admin/RulesPage.php:107
+#: src/Privacy/Privacy.php:112
+msgid "IP address"
+msgstr ""
+
+#: src/Admin/RulesPage.php:108
+msgid "Phrase"
+msgstr ""
+
+#: src/Admin/RulesPage.php:115
+msgid "Rule saved. It applies to new messages from now on."
+msgstr ""
+
+#: src/Admin/RulesPage.php:117
+msgid "That value doesn't look right for its type. Emails need an @, domains look like example.com, phrases need at least 3 characters."
+msgstr ""
+
+#: src/Admin/RulesPage.php:119
+msgid "Rule removed."
+msgstr ""
+
+#: src/Admin/RulesPage.php:121
+msgid "Rules are checked before the model. If a message matches both lists, \"Always allow\" wins."
+msgstr ""
+
+#: src/Admin/RulesPage.php:123
+msgid "Add a rule"
+msgstr ""
+
+#: src/Admin/RulesPage.php:127
+msgid "List"
+msgstr ""
+
+#: src/Admin/RulesPage.php:129
+#: src/Admin/RulesPage.php:146
+msgid "Always block"
+msgstr ""
+
+#: src/Admin/RulesPage.php:132
+#: src/Admin/RulesPage.php:163
+msgid "Type"
+msgstr ""
+
+#: src/Admin/RulesPage.php:138
+#: src/Admin/RulesPage.php:164
+msgid "Value"
+msgstr ""
+
+#: src/Admin/RulesPage.php:139
+msgid "e.g. seo-pros.example"
+msgstr ""
+
+#: src/Admin/RulesPage.php:140
+msgid "Add rule"
+msgstr ""
+
+#: src/Admin/RulesPage.php:159
+msgid "No rules yet."
+msgstr ""
+
+#: src/Admin/RulesPage.php:165
+msgid "Added"
+msgstr ""
+
+#: src/Admin/RulesPage.php:166
+msgid "Matches"
+msgstr ""
+
+#: src/Admin/RulesPage.php:167
+msgid "Actions"
+msgstr ""
+
+#: src/Admin/RulesPage.php:181
+msgid "Remove"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:71
+msgid "General"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:72
+msgid "Diagnostics"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:88
+msgid "Relaxed"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:88
+msgid "Holds only very obvious spam. Fewest real messages held by mistake."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:89
+msgid "Balanced"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:89
+msgid "Recommended."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:90
+msgid "Strict"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:90
+msgid "Holds more spam, but real enquiries are a little more likely to be held. Check the quarantine regularly."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:97
+msgid "Protect"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:106
+msgid "Sensitivity"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:114
+msgid "Possible-spam tag"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:117
+msgid "Added to the subject of form emails the model was unsure about. They are still delivered. Leave empty to turn this off."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:121
+msgid "Keep held messages for"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:122
+msgid "days"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:125
+msgid "Email digest"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:129
+msgid "Off"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:130
+msgid "Daily"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:131
+msgid "Weekly"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:137
+msgid "A short list of newly held messages, lowest score first. Sent only when something new was held."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:138
+msgid "Send to"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:143
+msgid "Privacy"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:145
+msgid "Store sender IP addresses with held messages"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:146
+msgid "IP addresses help you spot repeat senders. Nothing is ever sent off this site."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:165
+#: src/Admin/SettingsPage.php:176
+msgid "Model"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:166
+msgid "Trained"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:167
+msgid "Thresholds"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:168
+msgid "Model file"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:169
+msgid "Plugin version"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:178
+msgid "The spam model couldn't be loaded, so messages are being delivered without checking. Reinstall the plugin or contact support."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:187
+msgid "Self-test"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:188
+msgid "Three built-in samples, classified now. Nothing is stored."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:191
+msgid "as expected"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:191
+msgid "unexpected"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:195
+msgid "Error log"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:198
+msgid "No errors. Every message has been checked normally."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:200
+msgid "When a check fails, the message is delivered unchecked. The log never contains message content."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:218
+msgid "Booking enquiry"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:219
+msgid "Quote request"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:220
+msgid "SEO pitch"
+msgstr ""
+
+#: src/Privacy/Privacy.php:55
+#: src/Privacy/Privacy.php:69
+#: src/Privacy/Privacy.php:88
+msgid "Messages held as spam"
+msgstr ""
+
+#: src/Privacy/Privacy.php:100
+msgid "Status"
+msgstr ""
+
+#: src/Privacy/Privacy.php:104
+msgid "Name"
+msgstr ""
+
+#: src/Privacy/Privacy.php:154
+msgid "Messages sent through the forms and comments on this site are checked for spam by a model that runs on this website's own server. No message is sent to any outside service for this check."
+msgstr ""
+
+#: src/Privacy/Privacy.php:155
+msgid "Messages judged to be spam are held for review for a limited time (30 days by default) and then deleted automatically. A held message keeps the name, email address, IP address (if that setting is on) and text that were submitted."
+msgstr ""
+
+#: src/Stats/Digest.php:102
+msgid "today"
+msgstr ""
+
+#: src/Stats/Digest.php:102
+msgid "this week"
+msgstr ""
+
+#. translators: 1: site name, 2: number of messages, 3: "today" or "this week".
+#: src/Stats/Digest.php:106
+#, php-format
+msgid "[%1$s] %2$d message held as spam %3$s"
+msgid_plural "[%1$s] %2$d messages held as spam %3$s"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: number of messages, 2: site name, 3: "today" or "this week".
+#: src/Stats/Digest.php:109
+#, php-format
+msgid "%1$d message was held as spam on %2$s %3$s."
+msgid_plural "%1$d messages were held as spam on %2$s %3$s."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Stats/Digest.php:110
+msgid "Most likely to be real (lowest score first):"
+msgstr ""
+
+#. translators: %d: number of further messages.
+#: src/Stats/Digest.php:119
+#, php-format
+msgid "  …and %d more."
+msgstr ""
+
+#. translators: %s: quarantine URL.
+#: src/Stats/Digest.php:123
+#, php-format
+msgid "Open the quarantine: %s"
+msgstr ""
+
+#. translators: %d: number of days.
+#: src/Stats/Digest.php:126
+#, php-format
+msgid "Held messages are deleted after %d day."
+msgid_plural "Held messages are deleted after %d days."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: settings URL.
+#: src/Stats/Digest.php:128
+#, php-format
+msgid "Change digest settings: %s"
+msgstr ""

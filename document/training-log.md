@@ -16,11 +16,19 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 10 Nov 2026: stats, digest, privacy; release packaging (0.1.0)
+
+- **Stats and digest:** `laas_stats_daily` (schema 3) counts each classification once through a new `laas_classified` action, and releases through `laas_released` (which now also passes the source). Self-test and `laas_classify()` calls aren't counted. The dashboard widget shows 30-day counts, a held-per-day sparkline and a nudge when held messages sit near the threshold. The digest is plain text (weekly by default), lowest score first, with spam links replaced by `[link]`, and is sent only when something new was held. Privacy export and erase work by sender email, and suggested privacy-policy text is registered. `tests/wp/stats-check.php`: 15 checks.
+- **Packaging:** version 0.1.0; `readme.txt` with honest model numbers and the dataset credits `LICENCES.md` requires; `languages/local-ai-anti-spam.pot` (143 strings); `bin/build-zip.php` builds `dist/local-ai-anti-spam.zip` (37 files, 1.7 MB) from `.distignore`.
+- **Plugin Check (WordPress.org):** the first run had two errors. `model.bin` was rejected because `.bin` is a banned "application file" extension, so the shipped model is now `plugin/model/model.dat` (same format); and one file lacked a direct-access guard. Now: no errors; the warnings are table names from `$wpdb->prefix` in SQL.
+- **Found on the way:** PowerShell 5.1's `Set-Content -Encoding utf8` had added a byte-order mark to the main plugin file, which would print bytes before `<?php`; removed, and the build now refuses any PHP file that starts with one. The local site runs WordPress 7.1.4 (the earlier entry said 6.9 by mistake).
+- **CI:** a new "WordPress end to end" job runs every `tests/wp` check in wp-env, then Plugin Check (fails on any error); the PHP job also runs the latency benchmark and the zip build. Release steps are in `document/release.md`.
+
 ### 10 Nov 2026: allow and block rules; comments classified once
 
 - **Rules (F9, design.md §3.6):** `wp_laas_rules` (schema version 2, so existing sites upgrade on load) holds email, domain, IP and phrase rules. Domains match the sender's email domain and its subdomains; phrases are plain case-insensitive substrings, never regexes. Allow beats block, and rules run before the empty and language gates, so an explicit rule applies to any message. Values are normalised (`https://www.Example.com/x` → `example.com`) and invalid ones refused. Hits are counted, except for the Diagnostics self-test.
 - **Admin:** a Rules screen (add, list with hit counts, remove) and, after a single *Not spam*, an "Always allow <sender>?" button. Held-by-rule messages say which rule held them.
-- **Bug found by the rules test:** WordPress 6.9 applies `pre_comment_approved` twice for each new comment (from `wp_allow_comment()` and again from `wp_new_comment()`), so every genuine comment was scored twice and rule hits were doubled. The comments adapter now reuses its verdict for the same comment within a request.
+- **Bug found by the rules test:** WordPress 7.1 applies `pre_comment_approved` twice for each new comment (from `wp_allow_comment()` and again from `wp_new_comment()`), so every genuine comment was scored twice and rule hits were doubled. The comments adapter now reuses its verdict for the same comment within a request.
 - **Checks:** 377 PHPUnit tests (16 new for rules); `tests/wp/rules-check.php` (a harmless comment from a blocked domain goes to Spam, a spammy one from an allowed sender is delivered, each rule counts one hit); `admin-check.ps1` now 35 checks, including the allow offer, invalid values, removal and a subscriber being refused. Comments, CF7 capture and WPForms checks still pass.
 
 ### 10 Nov 2026: WPForms

@@ -1,7 +1,7 @@
 """Put a trained local model into the plugin: ``python -m laas.export --run runs/<id>``.
 
 Writes, together (architecture.md §13, agents.md "Ship a new local model"):
-- ``plugin/model/model.bin``: the run's model file, after checks;
+- ``plugin/model/model.dat``: the run's model file, after checks;
 - ``parity/release-fixtures.json``: Python's score on the shipped model for every parity input, so
   PHPUnit proves the plugin scores that exact file the same way (``ReleaseModelTest``);
 - ``training/eval/report.md``: the run's report, committed with the model.
@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ExportError, ValueError) as error:
         parser.error(str(error))
 
-    target = args.plugin / "model" / "model.bin"
+    target = args.plugin / "model" / "model.dat"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, target)
     fixtures = release_fixtures(target)

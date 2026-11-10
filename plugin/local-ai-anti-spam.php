@@ -3,7 +3,7 @@
  * Plugin Name:       Local AI Anti-Spam
  * Plugin URI:        https://github.com/aadilsal/Local-AI-Anti-Spam
  * Description:       Spam filtering for contact forms and comments, using a machine-learning model that runs on your own server. No CAPTCHA, no API key, no check limits.
- * Version:           0.0.1
+ * Version:           0.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Aadil Salman Butt
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LAAS_VERSION', '0.0.1' );
+define( 'LAAS_VERSION', '0.1.0' );
 define( 'LAAS_FILE', __FILE__ );
 define( 'LAAS_DIR', plugin_dir_path( __FILE__ ) );
 

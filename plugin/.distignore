@@ -1,0 +1,15 @@
+# Not shipped: read by bin/build-zip.php (one top-level file or folder per line).
+.distignore
+.wp-env.json
+.phpunit.result.cache
+bin
+dist
+node_modules
+tests
+vendor
+composer.json
+composer.lock
+package.json
+package-lock.json
+phpcs.xml.dist
+phpunit.xml.dist

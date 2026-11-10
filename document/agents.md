@@ -9,7 +9,7 @@ Instructions for AI coding agents (Claude Code and similar) and human contributo
 ## 1. What this project is, in five lines
 
 - A WordPress anti-spam plugin whose spam model runs **inside PHP on the customer's server**. There is no API key and no network call in the free plugin.
-- The model is a hashed n-gram logistic regression trained in Python and exported to `plugin/model/model.bin`.
+- The model is a hashed n-gram logistic regression trained in Python and exported to `plugin/model/model.dat` (the `model.bin` format; WordPress.org bans the `.bin` extension).
 - A paid Pro add-on (a separate plugin) sends only *borderline* messages to our FastAPI + ONNX cloud model.
 - The users are small-business owners. **A blocked real enquiry is the worst bug we can ship.**
 - One developer, about 20 h/week, running cost ≤ $20/month. Prefer boring, small and cheap.
@@ -43,14 +43,16 @@ npx wp-env run cli wp plugin check local-ai-anti-spam   # Plugin Check (T8)
 uv sync                               # or: pip install -r requirements.lock
 pytest                                # unit tests incl. featurizer + split-policy guards
 python -m laas.parity                 # regenerate parity/fixtures.json + parity-model.bin (after featurizer changes)
-python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + parity/release-fixtures.json + training/eval/report.md
+python -m laas.export --run runs/<id>-production  # plugin/model/model.dat + parity/release-fixtures.json + training/eval/report.md
 # Not built yet: laas.train (config-driven) and laas.eval --run (gates on the real test set).
 
 # PHP on the owner's PC: PHP 8.3 from winget (no 7.4 build there; CI covers 7.4) and
 # Composer at C:/Users/butta/tools/composer.phar. Docker (for wp-env) needs virtualisation on.
 #   php C:/Users/butta/tools/composer.phar install   (from plugin/)
 #   php vendor/bin/phpunit; php vendor/bin/phpcs
-#   php tests/bench/inference-bench.php model/model.bin
+#   php tests/bench/inference-bench.php model/model.dat
+#   php bin/build-zip.php                   # dist/local-ai-anti-spam.zip; release steps in document/release.md
+#   (wp-env) node_modules\.bin\wp-env run cli --env-cwd=wp-content/plugins/local-ai-anti-spam wp i18n make-pot . languages/local-ai-anti-spam.pot --exclude=tests,vendor,node_modules,bin,dist
 # Local WordPress (from plugin/). Node 26 has no prebuilt fs-ext-extra-prebuilt (needed only by
 # WordPress Playground, not Docker), so install without scripts and call the local wp-env:
 #   npm ci --ignore-scripts
