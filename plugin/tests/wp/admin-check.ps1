@@ -67,6 +67,20 @@ Check "POST without nonce refused ($($noNonce.Code))" ($noNonce.Code -eq 403)
 
 $release = Request $admin $page @("_wpnonce=$nonce", "laas_row_action=release:$real")
 Check "release redirects with success ($($release.Location))" ($release.Code -eq 302 -and $release.Location -match 'laas_done=release' -and $release.Location -match 'laas_ok=1')
+$offer = Request $admin $release.Location
+Check 'success notice offers to always allow the sender' ($offer.Body.Contains('Always allow sarah@example.co.uk?'))
+# The "Always allow" form sits in the notice, above the list form, so its nonce comes first.
+$rulesNonce = [regex]::Match($offer.Body, 'name="_wpnonce" value="([0-9a-f]+)"').Groups[1].Value
+$allow = Request $admin "$base/wp-admin/admin.php?page=laas-rules" @("_wpnonce=$rulesNonce", 'laas_rule_op=add', 'kind=email', 'value=sarah@example.co.uk', 'rule_action=allow')
+Check "always allow adds the rule ($($allow.Location))" ($allow.Location -match 'laas_rule=added')
+$rulesPage = Request $admin "$base/wp-admin/admin.php?page=laas-rules"
+Check 'rules screen lists the allowed sender' ($rulesPage.Code -eq 200 -and $rulesPage.Body.Contains('<code>sarah@example.co.uk</code>'))
+$rNonce = [regex]::Match($rulesPage.Body, 'name="_wpnonce" value="([0-9a-f]+)"').Groups[1].Value
+$bad = Request $admin "$base/wp-admin/admin.php?page=laas-rules" @("_wpnonce=$rNonce", 'laas_rule_op=add', 'kind=email', 'value=<script>x', 'rule_action=block')
+Check "invalid rule refused ($($bad.Location))" ($bad.Location -match 'laas_rule=invalid')
+$ruleId = [regex]::Match($rulesPage.Body, 'name="rule_id" value="(\d+)"').Groups[1].Value
+$remove = Request $admin "$base/wp-admin/admin.php?page=laas-rules" @("_wpnonce=$rNonce", 'laas_rule_op=delete', "rule_id=$ruleId")
+Check "rule removed ($($remove.Location))" ($remove.Location -match 'laas_rule=removed')
 
 $fail = Request $admin $page @("_wpnonce=$nonce", "laas_row_action=release:$orphan")
 Check "release without a form reports failure ($($fail.Location))" ($fail.Location -match 'laas_failed=1')
@@ -105,6 +119,8 @@ $subList = Request $sub $page
 Check "subscriber cannot open the quarantine ($($subList.Code))" ($subList.Code -eq 403)
 $subPost = Request $sub $page @("_wpnonce=$nonce", "laas_row_action=delete:$orphan")
 Check "subscriber cannot post actions ($($subPost.Code))" ($subPost.Code -eq 403)
+$subRules = Request $sub "$base/wp-admin/admin.php?page=laas-rules" @("_wpnonce=$rNonce", 'laas_rule_op=add', 'kind=domain', 'value=evil.example', 'rule_action=allow')
+Check "subscriber cannot add rules ($($subRules.Code))" ($subRules.Code -eq 403)
 
 $anon = Join-Path $tmp 'anon.jar'
 Remove-Item $anon -ErrorAction SilentlyContinue

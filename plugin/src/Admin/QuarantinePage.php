@@ -87,6 +87,12 @@ final class QuarantinePage {
 			'laas_ok'     => $done,
 			'laas_failed' => $failed,
 		);
+		if ( 'release' === $op && 1 === count( $ids ) && 0 === $failed ) {
+			$item = $this->plugin->repository()->find( $ids[0] );
+			if ( $item && '' !== (string) $item['sender_email'] ) {
+				$args['laas_sender'] = rawurlencode( (string) $item['sender_email'] );
+			}
+		}
 		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -182,12 +188,20 @@ final class QuarantinePage {
 		$op     = sanitize_key( wp_unslash( $_GET['laas_done'] ) );
 		$ok     = isset( $_GET['laas_ok'] ) ? absint( $_GET['laas_ok'] ) : 0;
 		$failed = isset( $_GET['laas_failed'] ) ? absint( $_GET['laas_failed'] ) : 0;
+		$sender = isset( $_GET['laas_sender'] ) ? sanitize_email( rawurldecode( wp_unslash( $_GET['laas_sender'] ) ) ) : '';
 		// phpcs:enable
 		if ( 'release' === $op && $ok > 0 ) {
 			echo '<div class="notice notice-success" tabindex="-1" id="laas-result"><p>';
 			/* translators: %d: number of messages. */
 			echo esc_html( sprintf( _n( '%d message delivered to its form\'s normal recipients.', '%d messages delivered to their forms\' normal recipients.', $ok, 'local-ai-anti-spam' ), $ok ) );
-			echo '</p></div><script>document.getElementById("laas-result").focus();</script>';
+			echo '</p>';
+			if ( '' !== $sender ) {
+				/* translators: %s: sender email address. */
+				echo '<p>' . esc_html( sprintf( __( 'Always allow %s?', 'local-ai-anti-spam' ), $sender ) ) . ' ';
+				echo RulesPage::add_button( 'email', $sender, 'allow', __( 'Always allow', 'local-ai-anti-spam' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped inside add_button().
+				echo '</p>';
+			}
+			echo '</div><script>document.getElementById("laas-result").focus();</script>';
 		}
 		if ( 'release' === $op && $failed > 0 ) {
 			echo '<div class="notice notice-error"><p>';
@@ -357,6 +371,11 @@ final class QuarantinePage {
 	 * @return string
 	 */
 	public static function why_line( string $reason, ?array $features, int $max ): string {
+		if ( 'rule:block' === $reason ) {
+			$token = (string) ( $features[0]['token'] ?? '' );
+			/* translators: %s: the matching rule, e.g. "domain:seo-pros.example". */
+			return sprintf( __( 'On your block list (%s)', 'local-ai-anti-spam' ), $token );
+		}
 		if ( 'model' !== $reason ) {
 			return 'error' === $reason ? __( 'Checks failed; held by mistake.', 'local-ai-anti-spam' ) : $reason;
 		}

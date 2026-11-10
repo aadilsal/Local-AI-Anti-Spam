@@ -18,6 +18,8 @@ use LocalAIAntiSpam\Integrations\WpForms;
 use LocalAIAntiSpam\Quarantine\Installer;
 use LocalAIAntiSpam\Quarantine\Releaser;
 use LocalAIAntiSpam\Quarantine\Repository;
+use LocalAIAntiSpam\Rules\Matcher;
+use LocalAIAntiSpam\Rules\RuleRepository;
 use LocalAIAntiSpam\Support\Settings;
 
 /**
@@ -52,6 +54,13 @@ final class Plugin {
 	 * @var Repository|null
 	 */
 	private $repository = null;
+
+	/**
+	 * Allow and block rules.
+	 *
+	 * @var RuleRepository|null
+	 */
+	private $rules = null;
 
 	/**
 	 * Integrations registered on this request, by ID.
@@ -125,9 +134,35 @@ final class Plugin {
 	 */
 	public function pipeline(): Pipeline {
 		if ( null === $this->pipeline ) {
-			$this->pipeline = new Pipeline( array( $this, 'load_model' ), self::t_high_offset() );
+			$this->pipeline = new Pipeline( array( $this, 'load_model' ), self::t_high_offset(), array( $this, 'match_rule' ) );
 		}
 		return $this->pipeline;
+	}
+
+	/**
+	 * Allow and block rules.
+	 *
+	 * @return RuleRepository
+	 */
+	public function rules(): RuleRepository {
+		if ( null === $this->rules ) {
+			$this->rules = new RuleRepository();
+		}
+		return $this->rules;
+	}
+
+	/**
+	 * The user's rule for a submission, counting the hit (F9).
+	 *
+	 * @param \LocalAIAntiSpam\Classifier\Submission $submission The submission.
+	 * @return array{id: int, kind: string, value: string, action: string}|null
+	 */
+	public function match_rule( $submission ): ?array {
+		$rule = Matcher::match( $this->rules()->all(), $submission );
+		if ( null !== $rule && 'self-test' !== $submission->source ) {
+			$this->rules()->record_hit( $rule['id'] );
+		}
+		return $rule;
 	}
 
 	/**

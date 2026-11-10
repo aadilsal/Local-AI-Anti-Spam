@@ -38,6 +38,16 @@ final class Comments implements Integration {
 	private $pending = null;
 
 	/**
+	 * Key of the comment last classified on this request, and its verdict. WordPress applies
+	 * `pre_comment_approved` twice for one new comment (from wp_allow_comment() and again from
+	 * wp_new_comment(), seen in WordPress 6.9), so the second call reuses the first verdict instead
+	 * of scoring again and counting rule hits twice.
+	 *
+	 * @var array{0: string, 1: Verdict}|null
+	 */
+	private $memo = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Pipeline $pipeline The pipeline.
@@ -112,7 +122,11 @@ final class Comments implements Integration {
 			if ( null === $submission ) {
 				return $approved;
 			}
-			$this->pending = $this->pipeline->classify( $submission );
+			$key = hash( 'sha256', implode( "\0", array( $submission->form_id, (string) $submission->email, (string) $submission->ip, $submission->text ) ) );
+			if ( null === $this->memo || $this->memo[0] !== $key ) {
+				$this->memo = array( $key, $this->pipeline->classify( $submission ) );
+			}
+			$this->pending = $this->memo[1];
 			return $this->pending->is_spam() ? 'spam' : $approved;
 		} catch ( \Throwable $error ) {
 			Log::error( 'comment', $error );

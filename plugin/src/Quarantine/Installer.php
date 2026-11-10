@@ -12,7 +12,7 @@ namespace LocalAIAntiSpam\Quarantine;
  */
 final class Installer {
 
-	const DB_VERSION        = 1;
+	const DB_VERSION        = 2; // 2: laas_rules.
 	const DB_VERSION_OPTION = 'laas_db_version';
 	const RETENTION_HOOK    = 'laas_retention';
 	const NOTICE_OPTION     = 'laas_activation_notice';
@@ -110,6 +110,21 @@ final class Installer {
 				KEY msg_hash (msg_hash)
 			) {$charset};"
 		);
+		$rules = \LocalAIAntiSpam\Rules\RuleRepository::table();
+		dbDelta(
+			"CREATE TABLE {$rules} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				kind varchar(16) NOT NULL,
+				value varchar(191) NOT NULL,
+				action varchar(8) NOT NULL,
+				created_at datetime NOT NULL,
+				created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+				hits bigint(20) unsigned NOT NULL DEFAULT 0,
+				last_hit_at datetime DEFAULT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY kind_value (kind,value)
+			) {$charset};"
+		);
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
 		if ( ! wp_next_scheduled( self::RETENTION_HOOK ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::RETENTION_HOOK );
@@ -123,8 +138,9 @@ final class Installer {
 	 */
 	public static function uninstall_site(): void {
 		global $wpdb;
-		$table = self::table();
-		$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own table; the name is not user input.
+		foreach ( array( self::table(), $wpdb->prefix . 'laas_rules' ) as $table ) {
+			$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Our own tables; the names are not user input.
+		}
 		foreach ( self::OPTIONS as $option ) {
 			delete_option( $option );
 		}

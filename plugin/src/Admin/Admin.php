@@ -83,10 +83,15 @@ final class Admin {
 
 		$page = new QuarantinePage( $this->plugin );
 		add_menu_page( __( 'Anti-Spam', 'local-ai-anti-spam' ), __( 'Anti-Spam', 'local-ai-anti-spam' ) . $badge, self::CAP, self::SLUG, array( $page, 'render' ), 'dashicons-shield', 80 );
-		$hook = add_submenu_page( self::SLUG, __( 'Quarantine', 'local-ai-anti-spam' ), __( 'Quarantine', 'local-ai-anti-spam' ), self::CAP, self::SLUG, array( $page, 'render' ) );
+		$hook       = add_submenu_page( self::SLUG, __( 'Quarantine', 'local-ai-anti-spam' ), __( 'Quarantine', 'local-ai-anti-spam' ), self::CAP, self::SLUG, array( $page, 'render' ) );
+		$rules      = new RulesPage( $this->plugin );
+		$rules_hook = add_submenu_page( self::SLUG, __( 'Rules', 'local-ai-anti-spam' ), __( 'Rules', 'local-ai-anti-spam' ), self::CAP, RulesPage::SLUG, array( $rules, 'render' ) );
 		add_submenu_page( self::SLUG, __( 'Anti-Spam Settings', 'local-ai-anti-spam' ), __( 'Settings', 'local-ai-anti-spam' ), 'manage_options', self::SETTINGS_SLUG, array( new SettingsPage( $this->plugin ), 'render' ) );
 		if ( $hook ) {
 			add_action( 'load-' . $hook, array( $page, 'load' ) );
+		}
+		if ( $rules_hook ) {
+			add_action( 'load-' . $rules_hook, array( $rules, 'load' ) );
 		}
 	}
 

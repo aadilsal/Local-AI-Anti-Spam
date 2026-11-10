@@ -63,7 +63,9 @@ python -m laas.export --run runs/<id>-production  # plugin/model/model.bin + par
 #   also makes any message containing LAAS-BORDERLINE score 0.8, to test borderline handling.
 # WPForms end to end (after cf7-setup.php has installed the mail capture):
 #   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/wpforms-check.php
-# Admin screens over HTTP (escaping, nonces, capabilities, release, delete, settings):
+# Rules through real comments:
+#   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/rules-check.php
+# Admin screens over HTTP (escaping, nonces, capabilities, release, delete, settings, rules):
 #   node_modules\.bin\wp-env run cli wp eval-file wp-content/plugins/local-ai-anti-spam/tests/wp/admin-seed.php   # prints 3 IDs
 #   powershell -File tests\wp\admin-check.ps1 -Ids "<the 3 IDs>"
 

@@ -47,14 +47,23 @@ final class Pipeline {
 	private $t_high_offset;
 
 	/**
+	 * Finds the user's allow or block rule for a submission (F9), or null.
+	 *
+	 * @var callable(Submission): (array{id: int, kind: string, value: string, action: string}|null)|null
+	 */
+	private $match_rule;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param callable(): LogisticModel $load_model    Loads the model lazily, never on page load.
 	 * @param float                     $t_high_offset Offset added to the model's t_high.
+	 * @param callable|null             $match_rule    Rule lookup; null means no rules.
 	 */
-	public function __construct( callable $load_model, float $t_high_offset = 0.0 ) {
+	public function __construct( callable $load_model, float $t_high_offset = 0.0, ?callable $match_rule = null ) {
 		$this->load_model    = $load_model;
 		$this->t_high_offset = $t_high_offset;
+		$this->match_rule    = $match_rule;
 	}
 
 	/**
@@ -82,6 +91,24 @@ final class Pipeline {
 		$early = apply_filters( 'laas_pre_classify', null, $submission );
 		if ( $early instanceof Verdict ) {
 			return $early;
+		}
+
+		// The user's own rules come first, before the gates: an explicit block or allow applies to
+		// any message, English or not.
+		$rule = null !== $this->match_rule ? call_user_func( $this->match_rule, $submission ) : null;
+		if ( is_array( $rule ) ) {
+			$allow = 'allow' === $rule['action'];
+			return new Verdict(
+				$allow ? Verdict::CLEAN : Verdict::SPAM,
+				$allow ? 0.0 : 1.0,
+				$allow ? 'rule:allow' : 'rule:block',
+				array(
+					array(
+						'token'  => $rule['kind'] . ':' . $rule['value'],
+						'weight' => 0.0,
+					),
+				)
+			);
 		}
 
 		$text = trim( $submission->text );

@@ -63,6 +63,26 @@ final class CommentsTest extends TestCase {
 		$this->assertSame( 1, self::comments_with( Verdict::CLEAN )->filter_approved( 1, self::COMMENT ) );
 	}
 
+	public function test_the_same_comment_is_classified_once_per_request() {
+		$calls = 0;
+		$GLOBALS['laas_test_filters']['laas_pre_classify'][] = static function () use ( &$calls ) {
+			++$calls;
+			return new Verdict( Verdict::CLEAN, 0.1, 'test' );
+		};
+		$comments = new Comments(
+			new Pipeline(
+				static function () {
+					throw new \LogicException( 'not needed' );
+				}
+			)
+		);
+		$comments->filter_approved( 0, self::COMMENT ); // From wp_allow_comment().
+		$comments->filter_approved( 0, self::COMMENT ); // Again from wp_new_comment().
+		$this->assertSame( 1, $calls );
+		$comments->filter_approved( 0, array( 'comment_content' => 'A different comment.' ) + self::COMMENT );
+		$this->assertSame( 2, $calls );
+	}
+
 	public function test_already_judged_comments_are_left_alone() {
 		$comments = self::comments_with( Verdict::CLEAN );
 		$this->assertSame( 'trash', $comments->filter_approved( 'trash', self::COMMENT ) );

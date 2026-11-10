@@ -16,6 +16,13 @@ A running record of data builds, generation runs and model runs: what was run, o
 
 ## Log
 
+### 10 Nov 2026: allow and block rules; comments classified once
+
+- **Rules (F9, design.md §3.6):** `wp_laas_rules` (schema version 2, so existing sites upgrade on load) holds email, domain, IP and phrase rules. Domains match the sender's email domain and its subdomains; phrases are plain case-insensitive substrings, never regexes. Allow beats block, and rules run before the empty and language gates, so an explicit rule applies to any message. Values are normalised (`https://www.Example.com/x` → `example.com`) and invalid ones refused. Hits are counted, except for the Diagnostics self-test.
+- **Admin:** a Rules screen (add, list with hit counts, remove) and, after a single *Not spam*, an "Always allow <sender>?" button. Held-by-rule messages say which rule held them.
+- **Bug found by the rules test:** WordPress 6.9 applies `pre_comment_approved` twice for each new comment (from `wp_allow_comment()` and again from `wp_new_comment()`), so every genuine comment was scored twice and rule hits were doubled. The comments adapter now reuses its verdict for the same comment within a request.
+- **Checks:** 377 PHPUnit tests (16 new for rules); `tests/wp/rules-check.php` (a harmless comment from a blocked domain goes to Spam, a spammy one from an allowed sender is delivered, each rule counts one hit); `admin-check.ps1` now 35 checks, including the allow offer, invalid values, removal and a subscriber being refused. Comments, CF7 capture and WPForms checks still pass.
+
 ### 10 Nov 2026: WPForms
 
 - **Adapter** (checked against WPForms Lite 2.0.4): `wpforms_process_honeypot` at priority 20, after WPForms' own honeypot. It runs once fields are formatted and before any entry or email; returning a reason makes WPForms stop silently, so the visitor sees the normal confirmation (WPForms' own behaviour for spam it catches). Password, hidden, payment, card, captcha, signature and file fields are neither classified nor stored.
